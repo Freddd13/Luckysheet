@@ -604,7 +604,7 @@ export function keyboardInitial(){
                         }
                         return;
                     }
-
+                    
                     selection.isPasteAction = true;
                     luckysheetactiveCell();
 
