@@ -867,13 +867,13 @@ const selection = {
                 for (let c = 0; c < clen; c++) {
                     let originCell = x[c + curC];
                     let value = dataChe[r][c];
-                    console.log('12323', value)
+                    // console.log('12323', value)
                     if (isRealNum(value)) {
                         // 如果单元格设置了纯文本格式，那么就不要转成数值类型了，防止数值过大自动转成科学计数法
                         if (
                           //   !originCell ||
-                          Math.abs(parseFloat(value)) >= 1e11 || // modified by kumo: 数字过长时避免转换为科学计数法
-                          Math.abs(parseFloat(value)) < 1e-9 || // modified by kumo: 数字过长时避免转换为科学计数法
+                        //   Math.abs(parseFloat(value)) >= 1e11 || // modified by kumo: 数字过长时避免转换为科学计数法
+                        //   Math.abs(parseFloat(value)) < 1e-9 || // modified by kumo: 数字过长时避免转换为科学计数法
                           (originCell &&
                             originCell.ct &&
                             originCell.ct.fa === "@")
