@@ -1762,7 +1762,7 @@ export function genarate(value) {//万 单位格式增加！！！
     
     if(value == null){
         return null;
-    }
+    } 
 
     if (/^-?[0-9]{1,}[,][0-9]{3}(.[0-9]{1,2})?$/.test(value)) { // 表述金额的字符串，如：12,000.00 或者 -12,000.00
         m = value
