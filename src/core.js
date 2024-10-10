@@ -148,8 +148,12 @@ luckysheet.create = function (setting) {
     if (luckysheetConfigsetting.safeStrMode) {
         // const defaultFmt = locale().defaultFmt;
         // [defaultFmt[0], defaultFmt[1]] = [defaultFmt[1], defaultFmt[0]];
-        locale().defaultFmt = [locale().defaultFmt[1]]
-        console.error(locale().defaultFmt);
+        // console.log("current default fmt:", locale().defaultFmt);
+        // root重载locale已经只剩下一下他
+        if (locale().defaultFmt.length>1) {
+          locale().defaultFmt = [locale().defaultFmt[1]];
+        }
+        // console.error(locale().defaultFmt);
     }
 
 
