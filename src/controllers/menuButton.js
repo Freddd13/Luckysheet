@@ -5269,9 +5269,10 @@ const menuButton = {
         const otherFormat = locale_defaultFmt.find(
           f => f.value === "fmtOtherSelf"
         );
+        const finalText = otherFormat?.text ?? "不支持格式";
         $menuButton
           .find(".luckysheet-toolbar-menu-button-caption")
-          .html(" " + otherFormat.text + " ");
+          .html(" " + finalText + " ");
       }
     }
   },

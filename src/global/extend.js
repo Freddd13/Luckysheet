@@ -11,6 +11,7 @@ import { checkProtectionAuthorityNormal, checkProtectionNotEnable } from "../con
 import { getSheetIndex } from "../methods/get";
 import Store from "../store";
 import method from "./method";
+import luckysheetConfigsetting from "../controllers/luckysheetConfigsetting";
 
 /**
  * 增加行列
@@ -36,7 +37,7 @@ function luckysheetextendtable(type, index, value, direction, sheetIndex) {
 
     value = Math.floor(value);
     let cfg = $.extend(true, {}, file.config);
-
+    
     //合并单元格配置变动
     if (cfg["merge"] == null) {
         cfg["merge"] = {};
@@ -585,7 +586,17 @@ function luckysheetextendtable(type, index, value, direction, sheetIndex) {
         // *添加空行模板这里请保持为push null;
         let row = [];
         for (let c = 0; c < d[0].length; c++) {
-            row.push(null);
+          row.push(
+            // check safemode
+            luckysheetConfigsetting.safeStrMode
+              ? {
+                  ct: {
+                    fa: "@",
+                    t: "s",
+                  },
+                }
+              : null
+          );
         }
 
         var cellBorderConfig = [];
@@ -742,7 +753,18 @@ function luckysheetextendtable(type, index, value, direction, sheetIndex) {
         // *添加空列模板这里请保持为push null;
         let col = [];
         for (let r = 0; r < d.length; r++) {
-            col.push(null);
+          // col.push(null);
+            col.push(
+            // check safemode
+            luckysheetConfigsetting.safeStrMode
+                ? {
+                    ct: {
+                    fa: "@",
+                    t: "s",
+                    },
+                }
+                : null
+            );
         }
 
         var cellBorderConfig = [];

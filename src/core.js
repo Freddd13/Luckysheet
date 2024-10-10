@@ -2,6 +2,7 @@ import defaultSetting from "./config.js";
 import { common_extend } from "./utils/util";
 import Store from "./store";
 import { locales } from "./locale/locale";
+import locale from "./locale/locale";
 import server from "./controllers/server";
 import luckysheetConfigsetting from "./controllers/luckysheetConfigsetting";
 import sheetmanage from "./controllers/sheetmanage";
@@ -139,8 +140,19 @@ luckysheet.create = function (setting) {
     luckysheetConfigsetting.initShowsheetbarConfig = false;
 
     luckysheetConfigsetting.imageUpdateMethodConfig = extendsetting.imageUpdateMethodConfig;
+    luckysheetConfigsetting.safeStrMode = extendsetting.safeStrMode;
 
     if (Store.lang === "zh") flatpickr.localize(Mandarin.zh);
+
+    // safe default 纯文本
+    if (luckysheetConfigsetting.safeStrMode) {
+        // const defaultFmt = locale().defaultFmt;
+        // [defaultFmt[0], defaultFmt[1]] = [defaultFmt[1], defaultFmt[0]];
+        locale().defaultFmt = [locale().defaultFmt[1]]
+        console.error(locale().defaultFmt);
+    }
+
+
 
     // Store the currently used plugins for monitoring asynchronous loading
     Store.asyncLoad.push(...luckysheetConfigsetting.plugins.map(plugin => plugin.name));

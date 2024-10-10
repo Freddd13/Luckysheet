@@ -244,22 +244,54 @@ const sheetmanage = {
             sheetconfig.name = sheetname;
             // sheet_defaullt_config.config={};
         } else {
-            //自定义sheet为空的话
-            sheetconfig = {
-                name: sheetname,
-                color: "",
-                status: "0",
-                order: order,
-                index: index,
-                celldata: [],
-                row: Store.defaultrowNum,
-                column: Store.defaultcolumnNum,
-                config: {},
-                pivotTable: null,
-                isPivotTable: !!isPivotTable,
-            };
+          //自定义sheet为空的话
+          sheetconfig = {
+            name: sheetname,
+            color: "",
+            status: "0",
+            order: order,
+            index: index,
+            celldata: [],
+            row: Store.defaultrowNum,
+            column: Store.defaultcolumnNum,
+            config: {},
+            pivotTable: null,
+            isPivotTable: !!isPivotTable,
+          };
         }
+
+        // safemode--add new sheet-->str(optional)
+        if (luckysheetConfigsetting.safeStrMode) {
+          // set current sheet
+          if (sheetconfig.celldata.length === 0) {
+            for (let row = 0; row < sheetconfig.row; row++) {
+              for (let column = 0; column < sheetconfig.column; column++) {
+                sheetconfig.celldata.push({
+                  r: row,
+                  c: column,
+                  v: {
+                    v: null,
+                    ct: {
+                      fa: "@",
+                      t: "s",
+                    },
+                  },
+                });
+              }
+            }
+          } else {
+            for (let i = 0; i < sheetconfig.celldata.length; i++) {
+              if (sheetconfig.celldata[i].ct.t != "inlineStr") {
+                sheetconfig.celldata[i].ct.fa = "@";
+                sheetconfig.celldata[i].ct.t = "s";
+              }
+            }
+          }
+        }
+
         Store.luckysheetfile.push(sheetconfig);
+        
+
 
         $("#luckysheet-sheet-area div.luckysheet-sheets-item").removeClass("luckysheet-sheets-item-active");
         $("#luckysheet-sheets-item" + index).addClass("luckysheet-sheets-item-active");
@@ -846,6 +878,7 @@ const sheetmanage = {
         }
     },
     initialjfFile: function(menu, title) {
+        // console.error("here needs safe init")
         let _this = this;
 
         _this.getCurSheet();

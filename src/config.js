@@ -67,4 +67,5 @@ export default {
     cellRightClickConfig:{}, //自定义单元格右键菜单
     sheetRightClickConfig:{}, //自定义底部sheet页右击菜单
     imageUpdateMethodConfig:{}, //自定义图片同步方式
+    safeStrMode: false
 }
