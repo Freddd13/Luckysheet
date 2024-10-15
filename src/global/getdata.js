@@ -182,7 +182,7 @@ export function getcellvalue(r, c, data, type) {
 //Data increase in rows and columns
 export function datagridgrowth(data, addr, addc, iscallback) {
     if (addr <= 0 && addc <= 0) {
-        return data;
+      return data;
     }
 
     if (addr <= 0) {

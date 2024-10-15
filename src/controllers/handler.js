@@ -6031,7 +6031,7 @@ export default function luckysheetHandler() {
                                 break;
                             }
                         } else {
-                            if (cpDataArr[r - copy_r1][c - copy_c1] != v) {
+                            if (cpDataArr[r - copy_r1][c - copy_c1] != v.trim()) {
                                 isEqual = false;
                                 break;
                             }

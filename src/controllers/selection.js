@@ -188,7 +188,7 @@ const selection = {
                 Store.config["rowlen"] == null ||
                 Store.config["rowlen"][r.toString()] == null
             ) {
-                cpdata += '<tr height="19">';
+                cpdata += `<tr height="${luckysheetConfigsetting.defaultRowHeight}">`;
             } else {
                 cpdata += `<tr height="${Store.config["rowlen"][r.toString()]}">`;
             }
@@ -202,7 +202,7 @@ const selection = {
                         Store.config["columnlen"] == null ||
                         Store.config["columnlen"][c.toString()] == null
                     ) {
-                        colgroup += '<col width="72px"></col>';
+                      colgroup += `<col width="${luckysheetConfigsetting.defaultColWidth}px"></col>`;
                     } else {
                         colgroup += '<col width="' + Store.config["columnlen"][c.toString()] + 'px"></col>';
                     }
