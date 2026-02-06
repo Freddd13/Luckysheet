@@ -31,7 +31,7 @@ import luckysheetConfigsetting from "./luckysheetConfigsetting";
 
 function getCopiedRowInsertMeta() {
     const copySave = Store.luckysheet_copy_save;
-    if (copySave == null || !Array.isArray(copySave.copyRange) || copySave.copyRange.length !== 1) {
+    if (copySave == null || !Array.isArray(copySave.copyRange) || copySave.copyRange.length === 0) {
         return null;
     }
 
@@ -47,19 +47,25 @@ function getCopiedRowInsertMeta() {
         return null;
     }
 
-    const sourceRange = copySave.copyRange[0];
-    if (sourceRange == null || !Array.isArray(sourceRange.row) || !Array.isArray(sourceRange.column)) {
-        return null;
-    }
-
     const sourceColumnLength = sourceSheetFile.data[0].length;
-    if (sourceRange.column[0] !== 0 || sourceRange.column[1] !== sourceColumnLength - 1) {
-        return null;
-    }
+    let rowCount = 0;
+    for (let i = 0; i < copySave.copyRange.length; i++) {
+        const sourceRange = copySave.copyRange[i];
+        if (sourceRange == null || !Array.isArray(sourceRange.row) || !Array.isArray(sourceRange.column)) {
+            return null;
+        }
 
-    const rowCount = sourceRange.row[1] - sourceRange.row[0] + 1;
-    if (!isRealNum(rowCount) || rowCount < 1) {
-        return null;
+        // Only support copied full rows to avoid ambiguous insert semantics.
+        if (sourceRange.column[0] !== 0 || sourceRange.column[1] !== sourceColumnLength - 1) {
+            return null;
+        }
+
+        const singleRangeRowCount = sourceRange.row[1] - sourceRange.row[0] + 1;
+        if (!isRealNum(singleRangeRowCount) || singleRangeRowCount < 1) {
+            return null;
+        }
+
+        rowCount += singleRangeRowCount;
     }
 
     return { rowCount };
