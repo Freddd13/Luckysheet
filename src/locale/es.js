@@ -6300,6 +6300,7 @@ export default {
         copy: 'Copiar',
         copyAs: 'Copiar como',
         paste: 'Pegar',
+        insertCopiedRow: 'Insertar fila copiada',
         insert: 'Insertar',
         delete: 'Eliminar',
         deleteCell: 'Eliminar celda',

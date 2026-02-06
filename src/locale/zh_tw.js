@@ -6310,6 +6310,7 @@ export default {
         copy             : '複製',
         copyAs           : '複製為',
         paste            : '粘貼',
+        insertCopiedRow  : '插入複製行',
         insert           : '插入',
         delete           : '删除',
         deleteCell       : '删除儲存格',

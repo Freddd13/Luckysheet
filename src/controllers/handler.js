@@ -1252,6 +1252,7 @@ export default function luckysheetHandler() {
                 let obj_s = Store.luckysheet_select_save[0];
 
                 const cellRightClickConfig = luckysheetConfigsetting.cellRightClickConfig;
+                $$("#luckysheet-insert-copied-row").style.display = "none";
 
                 $("#luckysheet-cols-rows-data").show();
                 $("#luckysheet-cols-rows-handleincell").show();

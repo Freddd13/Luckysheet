@@ -6613,6 +6613,7 @@ export default {
         copy: "Copy",
         copyAs: "Copy as",
         paste: "Paste",
+        insertCopiedRow: "Insert copied row",
         insert: "Insert",
         delete: "Delete",
         deleteCell: "Delete cell",

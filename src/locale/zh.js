@@ -6716,6 +6716,7 @@ export default {
     copy: "复制",
     copyAs: "复制为",
     paste: "粘贴",
+    insertCopiedRow: "插入复制行",
     insert: "插入",
     delete: "删除",
     deleteCell: "删除单元格",

@@ -25,8 +25,49 @@ import {
     checkProtectionAllSelected,
     checkProtectionAuthorityNormal,
 } from "./protection";
+import selection from "./selection";
 import Store from "../store";
 import luckysheetConfigsetting from "./luckysheetConfigsetting";
+
+function getCopiedRowInsertMeta() {
+    const copySave = Store.luckysheet_copy_save;
+    if (copySave == null || !Array.isArray(copySave.copyRange) || copySave.copyRange.length !== 1) {
+        return null;
+    }
+
+    const sourceSheetOrder = getSheetIndex(copySave.dataSheetIndex);
+    const sourceSheetFile = Store.luckysheetfile[sourceSheetOrder];
+    if (
+        sourceSheetFile == null ||
+        !Array.isArray(sourceSheetFile.data) ||
+        sourceSheetFile.data.length === 0 ||
+        !Array.isArray(sourceSheetFile.data[0]) ||
+        sourceSheetFile.data[0].length === 0
+    ) {
+        return null;
+    }
+
+    const sourceRange = copySave.copyRange[0];
+    if (sourceRange == null || !Array.isArray(sourceRange.row) || !Array.isArray(sourceRange.column)) {
+        return null;
+    }
+
+    const sourceColumnLength = sourceSheetFile.data[0].length;
+    if (sourceRange.column[0] !== 0 || sourceRange.column[1] !== sourceColumnLength - 1) {
+        return null;
+    }
+
+    const rowCount = sourceRange.row[1] - sourceRange.row[0] + 1;
+    if (!isRealNum(rowCount) || rowCount < 1) {
+        return null;
+    }
+
+    return { rowCount };
+}
+
+function canInsertCopiedRows(cellRightClickConfig) {
+    return !!cellRightClickConfig.insertRow && getCopiedRowInsertMeta() != null;
+}
 
 export function rowColumnOperationInitial() {
     //表格行标题 mouse事件
@@ -483,6 +524,9 @@ export function rowColumnOperationInitial() {
                     ? "block"
                     : "none";
                 $$("#luckysheet-bottom-right-add-selected").style.display = cellRightClickConfig.insertRow
+                    ? "block"
+                    : "none";
+                $$("#luckysheet-insert-copied-row").style.display = canInsertCopiedRows(cellRightClickConfig)
                     ? "block"
                     : "none";
                 $$("#luckysheet-del-selected").style.display = cellRightClickConfig.deleteRow ? "block" : "none";
@@ -1029,6 +1073,7 @@ export function rowColumnOperationInitial() {
                 $$("#luckysheet-bottom-right-add-selected").style.display = cellRightClickConfig.insertColumn
                     ? "block"
                     : "none";
+                $$("#luckysheet-insert-copied-row").style.display = "none";
                 $$("#luckysheet-del-selected").style.display = cellRightClickConfig.deleteColumn ? "block" : "none";
                 $$("#luckysheet-hide-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
                 $$("#luckysheet-show-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
@@ -1270,6 +1315,7 @@ export function rowColumnOperationInitial() {
         $$("#luckysheet-bottom-right-add-selected").style.display = cellRightClickConfig.insertColumn
             ? "block"
             : "none";
+        $$("#luckysheet-insert-copied-row").style.display = "none";
         $$("#luckysheet-del-selected").style.display = cellRightClickConfig.deleteColumn ? "block" : "none";
         $$("#luckysheet-hide-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
         $$("#luckysheet-show-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
@@ -1393,6 +1439,49 @@ export function rowColumnOperationInitial() {
 
         let st_index = Store.luckysheet_select_save[0].column[0];
         luckysheetextendtable("column", st_index, 1, "lefttop");
+    });
+
+    $("#luckysheet-insert-copied-row").click(function() {
+        $("#luckysheet-rightclick-menu").hide();
+        luckysheetContainerFocus();
+
+        if (Store.allowEdit === false || Store.luckysheetRightHeadClickIs !== "row") {
+            return;
+        }
+
+        const _locale = locale();
+        const locale_drag = _locale.drag;
+
+        if (Store.luckysheet_select_save.length > 1) {
+            if (isEditMode()) {
+                alert(locale_drag.noMulti);
+            } else {
+                tooltip.info(locale_drag.noMulti, "");
+            }
+            return;
+        }
+
+        const copiedRowMeta = getCopiedRowInsertMeta();
+        if (copiedRowMeta == null) {
+            if (isEditMode()) {
+                alert(locale_drag.noPaste);
+            } else {
+                tooltip.info(locale_drag.noPaste, "");
+            }
+            return;
+        }
+
+        if (!checkProtectionAuthorityNormal(Store.currentSheetIndex, "insertRows")) {
+            return;
+        }
+
+        let st_index = Store.luckysheet_select_save[0].row[0];
+        if (!method.createHookFunction("rowInsertBefore", st_index, copiedRowMeta.rowCount, "lefttop", "row")) {
+            return;
+        }
+
+        luckysheetextendtable("row", st_index, copiedRowMeta.rowCount, "lefttop");
+        selection.pasteHandlerOfCopyPaste(Store.luckysheet_copy_save);
     });
 
     // custom right-click a cell buttton click

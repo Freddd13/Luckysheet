@@ -491,6 +491,11 @@ function rightclickHTML() {
                             }</span>
                         </div>
                     </div>
+                    <div id="luckysheet-insert-copied-row" class="luckysheet-cols-menuitem luckysheet-mousedown-cancel" style="display:none;">
+                        <div class="luckysheet-cols-menuitem-content luckysheet-mousedown-cancel">${
+                            rightclick.insertCopiedRow
+                        }</div>
+                    </div>
                     <div id="luckysheet-del-selected" class="luckysheet-cols-menuitem luckysheet-mousedown-cancel">
                         <div class="luckysheet-cols-menuitem-content luckysheet-mousedown-cancel">
                             ${rightclick.deleteSelected}
