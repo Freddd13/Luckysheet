@@ -1503,7 +1503,6 @@ const selection = {
         }
     },
     pasteHandlerOfCopyPaste: function(copyRange) {
-        console.log('paste by copy paste')
         if (!checkProtectionLockedRangeList(Store.luckysheet_select_save, Store.currentSheetIndex)) {
             return;
         }

@@ -68,11 +68,36 @@ function getCopiedRowInsertMeta() {
         rowCount += singleRangeRowCount;
     }
 
-    return { rowCount };
+    return { rowCount, sourceColumnLength };
+}
+
+function isCopiedRowInsertTargetCompatible(copiedRowMeta) {
+    if (copiedRowMeta == null || !isRealNum(copiedRowMeta.sourceColumnLength)) {
+        return false;
+    }
+
+    const targetSheetOrder = getSheetIndex(Store.currentSheetIndex);
+    const targetSheetFile = Store.luckysheetfile[targetSheetOrder];
+    if (
+        targetSheetFile == null ||
+        !Array.isArray(targetSheetFile.data) ||
+        targetSheetFile.data.length === 0 ||
+        !Array.isArray(targetSheetFile.data[0]) ||
+        targetSheetFile.data[0].length === 0
+    ) {
+        return false;
+    }
+
+    return copiedRowMeta.sourceColumnLength === targetSheetFile.data[0].length;
 }
 
 function canInsertCopiedRows(cellRightClickConfig) {
-    return !!cellRightClickConfig.insertRow && getCopiedRowInsertMeta() != null;
+    if (!cellRightClickConfig.insertRow) {
+        return false;
+    }
+
+    const copiedRowMeta = getCopiedRowInsertMeta();
+    return isCopiedRowInsertTargetCompatible(copiedRowMeta);
 }
 
 export function rowColumnOperationInitial() {
@@ -1469,6 +1494,14 @@ export function rowColumnOperationInitial() {
 
         const copiedRowMeta = getCopiedRowInsertMeta();
         if (copiedRowMeta == null) {
+            if (isEditMode()) {
+                alert(locale_drag.noPaste);
+            } else {
+                tooltip.info(locale_drag.noPaste, "");
+            }
+            return;
+        }
+        if (!isCopiedRowInsertTargetCompatible(copiedRowMeta)) {
             if (isEditMode()) {
                 alert(locale_drag.noPaste);
             } else {

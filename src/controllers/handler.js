@@ -6032,7 +6032,12 @@ export default function luckysheetHandler() {
                                 break;
                             }
                         } else {
-                            if (cpDataArr[r - copy_r1][c - copy_c1] != v.trim()) {
+                            const copyCellValue = cpDataArr[r - copy_r1][c - copy_c1];
+                            const normalizedCopyCellValue =
+                                copyCellValue == null ? "" : String(copyCellValue).trim();
+                            const normalizedStoreValue = typeof v === "string" ? v.trim() : String(v).trim();
+
+                            if (normalizedCopyCellValue !== normalizedStoreValue) {
                                 isEqual = false;
                                 break;
                             }
@@ -6108,9 +6113,15 @@ export default function luckysheetHandler() {
                                     cell.m = mask[0];
                                 }
 
-                                let bg = $td.css("background-color");
-                                if (bg == "rgba(0, 0, 0, 0)") {
-                                    bg = null;
+                                let bg = null;
+                                const styleText = ($td.attr("style") || "").toLowerCase();
+                                const hasExplicitBgStyle = styleText.indexOf("background") > -1;
+                                const bgColorAttr = $td.attr("bgcolor");
+                                if (hasExplicitBgStyle || bgColorAttr != null) {
+                                    bg = $td.css("background-color");
+                                    if (bg == "rgba(0, 0, 0, 0)" || bg == "transparent") {
+                                        bg = bgColorAttr || null;
+                                    }
                                 }
 
                                 cell.bg = bg;

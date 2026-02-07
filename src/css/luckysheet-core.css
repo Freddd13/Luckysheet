@@ -2338,15 +2338,55 @@ body:not(.ewa-ipad) .luckysheet-rows-h-cell-sel:hover {
     user-select: none;
 }
 
-.luckysheet-rightgclick-menu .luckysheet-cols-menuitem .luckysheet-cols-menuitem-content {
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-cols-menuitem .luckysheet-cols-menuitem-content {
     position: relative;
-    color: #333;
+    color: #1f2937;
     cursor: pointer;
     list-style: none;
     margin: 0;
-    padding: 6px 15px 6px 20px;
+    padding: 7px 32px 7px 12px;
     white-space: nowrap;
     user-select: none;
+    line-height: 20px;
+}
+
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) {
+    border: 1px solid #d7e0ea;
+    border-radius: 10px;
+    box-shadow: 0 12px 32px rgba(15, 23, 42, 0.18), 0 2px 8px rgba(15, 23, 42, 0.1);
+    padding: 8px;
+}
+
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-cols-menuitem {
+    border-radius: 7px;
+    margin: 1px 0;
+    padding: 0;
+    transition: background-color 0.16s ease;
+}
+
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-cols-menuitem:hover,
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-cols-menuitem-hover {
+    background: #ecf3ff;
+}
+
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-menuseparator {
+    border-top-color: #e8edf4;
+    margin: 8px 4px;
+}
+
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-submenu-arrow {
+    right: 10px;
+    padding-top: 0;
+    font-size: 11px;
+    line-height: 20px;
+    color: #7b8794;
+    opacity: 1;
+    filter: none;
+}
+
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-cols-menuitem:hover .luckysheet-submenu-arrow,
+.luckysheet-rightgclick-menu:not(.luckysheet-menuButton):not(.luckysheet-menuButton-sub) .luckysheet-cols-menuitem-hover .luckysheet-submenu-arrow {
+    color: #4b5563;
 }
 
 #luckysheet-cols-menu .luckysheet-cols-menuitem,
