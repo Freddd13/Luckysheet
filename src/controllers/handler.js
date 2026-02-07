@@ -6113,15 +6113,9 @@ export default function luckysheetHandler() {
                                     cell.m = mask[0];
                                 }
 
-                                let bg = null;
-                                const styleText = ($td.attr("style") || "").toLowerCase();
-                                const hasExplicitBgStyle = styleText.indexOf("background") > -1;
-                                const bgColorAttr = $td.attr("bgcolor");
-                                if (hasExplicitBgStyle || bgColorAttr != null) {
-                                    bg = $td.css("background-color");
-                                    if (bg == "rgba(0, 0, 0, 0)" || bg == "transparent") {
-                                        bg = bgColorAttr || null;
-                                    }
+                                let bg = $td.css("background-color");
+                                if (bg == "rgba(0, 0, 0, 0)") {
+                                    bg = null;
                                 }
 
                                 cell.bg = bg;

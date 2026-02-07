@@ -92,12 +92,10 @@ function isCopiedRowInsertTargetCompatible(copiedRowMeta) {
 }
 
 function canInsertCopiedRows(cellRightClickConfig) {
-    if (!cellRightClickConfig.insertRow) {
+    if (!cellRightClickConfig.insertRow || !cellRightClickConfig.paste) {
         return false;
     }
-
-    const copiedRowMeta = getCopiedRowInsertMeta();
-    return isCopiedRowInsertTargetCompatible(copiedRowMeta);
+    return true;
 }
 
 export function rowColumnOperationInitial() {
@@ -1480,6 +1478,11 @@ export function rowColumnOperationInitial() {
             return;
         }
 
+        const cellRightClickConfig = luckysheetConfigsetting.cellRightClickConfig;
+        if (!cellRightClickConfig.insertRow || !cellRightClickConfig.paste) {
+            return;
+        }
+
         const _locale = locale();
         const locale_drag = _locale.drag;
 
@@ -1492,35 +1495,144 @@ export function rowColumnOperationInitial() {
             return;
         }
 
-        const copiedRowMeta = getCopiedRowInsertMeta();
-        if (copiedRowMeta == null) {
-            if (isEditMode()) {
-                alert(locale_drag.noPaste);
-            } else {
-                tooltip.info(locale_drag.noPaste, "");
-            }
-            return;
-        }
-        if (!isCopiedRowInsertTargetCompatible(copiedRowMeta)) {
-            if (isEditMode()) {
-                alert(locale_drag.noPaste);
-            } else {
-                tooltip.info(locale_drag.noPaste, "");
-            }
-            return;
-        }
-
         if (!checkProtectionAuthorityNormal(Store.currentSheetIndex, "insertRows")) {
             return;
         }
 
-        let st_index = Store.luckysheet_select_save[0].row[0];
-        if (!method.createHookFunction("rowInsertBefore", st_index, copiedRowMeta.rowCount, "lefttop", "row")) {
+        const st_index = Store.luckysheet_select_save[0].row[0];
+
+        const alertNoPaste = function() {
+            if (isEditMode()) {
+                alert(locale_drag.noPaste);
+            } else {
+                tooltip.info(locale_drag.noPaste, "");
+            }
+        };
+
+        const insertRowsThenPasteCopySave = function(copiedRowMeta) {
+            if (!method.createHookFunction("rowInsertBefore", st_index, copiedRowMeta.rowCount, "lefttop", "row")) {
+                return;
+            }
+
+            luckysheetextendtable("row", st_index, copiedRowMeta.rowCount, "lefttop");
+            if (Store.luckysheet_paste_iscut) {
+                Store.luckysheet_paste_iscut = false;
+                selection.pasteHandlerOfCutPaste(Store.luckysheet_copy_save);
+                selection.clearcopy();
+            } else {
+                selection.pasteHandlerOfCopyPaste(Store.luckysheet_copy_save);
+            }
+        };
+
+        const insertRowsThenPastePlainText = function(text) {
+            if (text == null || String(text).length === 0) {
+                alertNoPaste();
+                return;
+            }
+
+            const plainText = String(text).replace(/\r/g, "");
+            const lines = plainText.split("\n");
+            if (lines.length === 0) {
+                alertNoPaste();
+                return;
+            }
+
+            const columnCount = lines[0].split("\t").length;
+            let rowCount = 0;
+            for (let i = 0; i < lines.length; i++) {
+                if (lines[i].split("\t").length < columnCount) {
+                    continue;
+                }
+                rowCount += 1;
+            }
+
+            if (rowCount < 1) {
+                alertNoPaste();
+                return;
+            }
+
+            if (!method.createHookFunction("rowInsertBefore", st_index, rowCount, "lefttop", "row")) {
+                return;
+            }
+
+            luckysheetextendtable("row", st_index, rowCount, "lefttop");
+            selection.pasteHandler(plainText);
+        };
+
+        const copiedRowMeta = getCopiedRowInsertMeta();
+        const canPasteCopySave = copiedRowMeta != null && isCopiedRowInsertTargetCompatible(copiedRowMeta);
+
+        if (navigator.clipboard != null && typeof navigator.clipboard.read === "function") {
+            navigator.clipboard
+                .read()
+                .then(function(items) {
+                    if (items == null || items.length == null || items.length === 0) {
+                        throw new Error("empty clipboard items");
+                    }
+
+                    const item = items[0];
+                    const htmlPromise =
+                        item.types != null && item.types.indexOf("text/html") > -1
+                            ? item.getType("text/html").then(function(blob) {
+                                  return blob.text();
+                              })
+                            : Promise.resolve(null);
+                    const textPromise =
+                        item.types != null && item.types.indexOf("text/plain") > -1
+                            ? item.getType("text/plain").then(function(blob) {
+                                  return blob.text();
+                              })
+                            : Promise.resolve(null);
+
+                    return Promise.all([htmlPromise, textPromise]);
+                })
+                .then(function(result) {
+                    const html = result[0];
+                    const text = result[1];
+
+                    if (html != null && html.indexOf("luckysheet_copy_action_table") > -1) {
+                        if (!canPasteCopySave) {
+                            alertNoPaste();
+                            return;
+                        }
+                        insertRowsThenPasteCopySave(copiedRowMeta);
+                        return;
+                    }
+
+                    insertRowsThenPastePlainText(text);
+                })
+                .catch(function() {
+                    if (canPasteCopySave && Store.iscopyself) {
+                        insertRowsThenPasteCopySave(copiedRowMeta);
+                        return;
+                    }
+
+                    if (navigator.clipboard != null && typeof navigator.clipboard.readText === "function") {
+                        navigator.clipboard.readText().then(insertRowsThenPastePlainText).catch(alertNoPaste);
+                    } else {
+                        alertNoPaste();
+                    }
+                });
             return;
         }
 
-        luckysheetextendtable("row", st_index, copiedRowMeta.rowCount, "lefttop");
-        selection.pasteHandlerOfCopyPaste(Store.luckysheet_copy_save);
+        if (navigator.clipboard != null && typeof navigator.clipboard.readText === "function") {
+            navigator.clipboard.readText().then(insertRowsThenPastePlainText).catch(function() {
+                if (canPasteCopySave && Store.iscopyself) {
+                    insertRowsThenPasteCopySave(copiedRowMeta);
+                    return;
+                }
+                alertNoPaste();
+            });
+            return;
+        }
+
+        if (canPasteCopySave && Store.iscopyself) {
+            insertRowsThenPasteCopySave(copiedRowMeta);
+            return;
+        }
+
+        alertNoPaste();
     });
 
     // custom right-click a cell buttton click
