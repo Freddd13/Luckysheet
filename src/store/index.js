@@ -134,7 +134,7 @@ const Store = {
     inlineStringEditRange:null,
 
     fontList:[],
-    defaultFontSize: 10,
+    defaultFontSize: 11,
 
     currentSheetView:"viewNormal",
 

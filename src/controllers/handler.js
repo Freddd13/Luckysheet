@@ -1252,7 +1252,8 @@ export default function luckysheetHandler() {
                 let obj_s = Store.luckysheet_select_save[0];
 
                 const cellRightClickConfig = luckysheetConfigsetting.cellRightClickConfig;
-                $$("#luckysheet-insert-copied-row").style.display = "none";
+                $$("#luckysheet-insert-copied-row-above").style.display = "none";
+                $$("#luckysheet-insert-copied-row-below").style.display = "none";
 
                 $("#luckysheet-cols-rows-data").show();
                 $("#luckysheet-cols-rows-handleincell").show();
@@ -6140,20 +6141,24 @@ export default function luckysheetHandler() {
                                     cell.it = 1;
                                 }
 
-                                let ff = $td.css("font-family");
-                                let ffs = ff.split(",");
-                                for (let i = 0; i < ffs.length; i++) {
-                                    let fa = $.trim(ffs[i].toLowerCase());
-                                    fa = locale_fontjson[fa];
-                                    if (fa == null) {
-                                        cell.ff = 0;
-                                    } else {
-                                        cell.ff = fa;
-                                        break;
+                                let inlineFontFamily = $td[0].style.fontFamily;
+                                if (inlineFontFamily) {
+                                    let ffs = inlineFontFamily.split(",");
+                                    for (let i = 0; i < ffs.length; i++) {
+                                        let fa = $.trim(ffs[i].toLowerCase());
+                                        fa = locale_fontjson[fa];
+                                        if (fa == null) {
+                                            cell.ff = 0;
+                                        } else {
+                                            cell.ff = fa;
+                                            break;
+                                        }
                                     }
                                 }
-                                let fs = Math.round((parseInt($td.css("font-size")) * 72) / 96);
-                                cell.fs = fs;
+                                let inlineFontSize = $td[0].style.fontSize;
+                                if (inlineFontSize) {
+                                    cell.fs = Math.round((parseInt(inlineFontSize) * 72) / 96);
+                                }
 
                                 let fc = $td.css("color");
                                 cell.fc = fc;

@@ -6166,8 +6166,8 @@ export default {
     fontFamily: {
         MicrosoftYaHei: "Microsoft YaHei",
     },
-    fontarray: ["Times New Roman", "Arial", "Tahoma", "Verdana", "微軟雅黑", "宋體", "黑體", "楷體", "仿宋", "新宋體", "華文新魏", "華文行楷", "華文隸書"],
-    fontjson : { "times new roman": 0, "arial": 1, "tahoma": 2, "verdana": 3, "微軟雅黑": 4, "microsoft yahei": 4, "宋體": 5, "simsun": 5, "黑體": 6, "simhei": 6, "楷體": 7, "kaiti": 7, "仿宋": 8, "fangsong": 8, "新宋體": 9, "nsimsun": 9, "華文新魏": 10, "stxinwei": 10, "華文行楷": 11, "stxingkai": 11, "華文隸書": 12, "stliti": 12, },
+    fontarray: ["等线", "Times New Roman", "Arial", "Tahoma", "Verdana", "微軟雅黑", "宋體", "黑體", "楷體", "仿宋", "新宋體", "華文新魏", "華文行楷", "華文隸書"],
+    fontjson : { "等线": 0, "times new roman": 1, "arial": 2, "tahoma": 3, "verdana": 4, "微軟雅黑": 5, "microsoft yahei": 5, "宋體": 6, "simsun": 6, "黑體": 7, "simhei": 7, "楷體": 8, "kaiti": 8, "仿宋": 9, "fangsong": 9, "新宋體": 10, "nsimsun": 10, "華文新魏": 11, "stxinwei": 11, "華文行楷": 12, "stxingkai": 12, "華文隸書": 13, "stliti": 13, },
     border   : {
         borderTop       : '上框線',
         borderBottom    : '下框線',
@@ -6311,6 +6311,8 @@ export default {
         copyAs           : '複製為',
         paste            : '粘貼',
         insertCopiedRow  : '插入複製行',
+        insertCopiedRowAbove: '在上方插入複製行',
+        insertCopiedRowBelow: '在下方插入複製行',
         insert           : '插入',
         delete           : '删除',
         deleteCell       : '删除儲存格',

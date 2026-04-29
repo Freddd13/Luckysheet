@@ -555,7 +555,10 @@ export function rowColumnOperationInitial() {
                 $$("#luckysheet-bottom-right-add-selected").style.display = cellRightClickConfig.insertRow
                     ? "block"
                     : "none";
-                $$("#luckysheet-insert-copied-row").style.display = canInsertCopiedRows(cellRightClickConfig)
+                $$("#luckysheet-insert-copied-row-above").style.display = canInsertCopiedRows(cellRightClickConfig)
+                    ? "block"
+                    : "none";
+                $$("#luckysheet-insert-copied-row-below").style.display = canInsertCopiedRows(cellRightClickConfig)
                     ? "block"
                     : "none";
                 $$("#luckysheet-del-selected").style.display = cellRightClickConfig.deleteRow ? "block" : "none";
@@ -1102,7 +1105,8 @@ export function rowColumnOperationInitial() {
                 $$("#luckysheet-bottom-right-add-selected").style.display = cellRightClickConfig.insertColumn
                     ? "block"
                     : "none";
-                $$("#luckysheet-insert-copied-row").style.display = "none";
+                $$("#luckysheet-insert-copied-row-above").style.display = "none";
+                $$("#luckysheet-insert-copied-row-below").style.display = "none";
                 $$("#luckysheet-del-selected").style.display = cellRightClickConfig.deleteColumn ? "block" : "none";
                 $$("#luckysheet-hide-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
                 $$("#luckysheet-show-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
@@ -1344,7 +1348,8 @@ export function rowColumnOperationInitial() {
         $$("#luckysheet-bottom-right-add-selected").style.display = cellRightClickConfig.insertColumn
             ? "block"
             : "none";
-        $$("#luckysheet-insert-copied-row").style.display = "none";
+        $$("#luckysheet-insert-copied-row-above").style.display = "none";
+        $$("#luckysheet-insert-copied-row-below").style.display = "none";
         $$("#luckysheet-del-selected").style.display = cellRightClickConfig.deleteColumn ? "block" : "none";
         $$("#luckysheet-hide-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
         $$("#luckysheet-show-selected").style.display = cellRightClickConfig.hideColumn ? "block" : "none";
@@ -1470,7 +1475,7 @@ export function rowColumnOperationInitial() {
         luckysheetextendtable("column", st_index, 1, "lefttop");
     });
 
-    $("#luckysheet-insert-copied-row").click(function() {
+    const insertCopiedRows = function(direction) {
         $("#luckysheet-rightclick-menu").hide();
         luckysheetContainerFocus();
 
@@ -1499,7 +1504,9 @@ export function rowColumnOperationInitial() {
             return;
         }
 
-        const st_index = Store.luckysheet_select_save[0].row[0];
+        const st_index = direction === "lefttop"
+            ? Store.luckysheet_select_save[0].row[0]
+            : Store.luckysheet_select_save[0].row[1];
 
         const alertNoPaste = function() {
             if (isEditMode()) {
@@ -1510,11 +1517,11 @@ export function rowColumnOperationInitial() {
         };
 
         const insertRowsThenPasteCopySave = function(copiedRowMeta) {
-            if (!method.createHookFunction("rowInsertBefore", st_index, copiedRowMeta.rowCount, "lefttop", "row")) {
+            if (!method.createHookFunction("rowInsertBefore", st_index, copiedRowMeta.rowCount, direction, "row")) {
                 return;
             }
 
-            luckysheetextendtable("row", st_index, copiedRowMeta.rowCount, "lefttop");
+            luckysheetextendtable("row", st_index, copiedRowMeta.rowCount, direction);
             if (Store.luckysheet_paste_iscut) {
                 Store.luckysheet_paste_iscut = false;
                 selection.pasteHandlerOfCutPaste(Store.luckysheet_copy_save);
@@ -1551,11 +1558,11 @@ export function rowColumnOperationInitial() {
                 return;
             }
 
-            if (!method.createHookFunction("rowInsertBefore", st_index, rowCount, "lefttop", "row")) {
+            if (!method.createHookFunction("rowInsertBefore", st_index, rowCount, direction, "row")) {
                 return;
             }
 
-            luckysheetextendtable("row", st_index, rowCount, "lefttop");
+            luckysheetextendtable("row", st_index, rowCount, direction);
             selection.pasteHandler(plainText);
         };
 
@@ -1633,6 +1640,14 @@ export function rowColumnOperationInitial() {
         }
 
         alertNoPaste();
+    };
+
+    $("#luckysheet-insert-copied-row-above").click(function() {
+        insertCopiedRows("lefttop");
+    });
+
+    $("#luckysheet-insert-copied-row-below").click(function() {
+        insertCopiedRows("rightbottom");
     });
 
     // custom right-click a cell buttton click
