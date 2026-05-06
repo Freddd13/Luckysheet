@@ -1534,16 +1534,22 @@ export function rowColumnOperationInitial() {
                 return;
             }
 
-            // 行号偏移由 luckysheetextendtable 内部统一处理（同步 cs.copyRange + selection_range）。
-            // 强行走 cut 分支（pasteHandlerOfCutPaste）会因新选区缺 row_focus/column_focus 让粘贴循环空转，
-            // 且其源清除循环按旧行号清已偏移 flowdata 会清错无关行；所以一律走 copy 路径。
+            // 行号偏移由 luckysheetextendtable 内部统一处理（同步 cs.copyRange + selection_range，
+            // 并把偏移快照挂到 jfredo 顶层项以便撤销/重做回滚）。cut 路径补 row_focus/column_focus 后，
+            // pasteHandlerOfCutPaste 内部 minh/maxh/minc/maxc 与 select_save.row/column 完全一致，
+            // 既能正常粘贴又能清掉源行——等同于 Excel "剪切+插入"的标准移动语义。
             const wasCut = Store.luckysheet_paste_iscut === true;
             luckysheetextendtable("row", st_index, copiedRowMeta.rowCount, direction);
-            selection.pasteHandlerOfCopyPaste(Store.luckysheet_copy_save);
             if (wasCut) {
-                // 剪切是一次性语义：插入复制行已消耗了"延后移动"的语义，清掉剪切态与虚线框。
+                const sel = Store.luckysheet_select_save[Store.luckysheet_select_save.length - 1];
+                sel.row_focus = sel.row[0];
+                sel.column_focus = sel.column[0];
+
                 Store.luckysheet_paste_iscut = false;
+                selection.pasteHandlerOfCutPaste(Store.luckysheet_copy_save);
                 selection.clearcopy();
+            } else {
+                selection.pasteHandlerOfCopyPaste(Store.luckysheet_copy_save);
             }
         };
 

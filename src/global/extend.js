@@ -929,14 +929,28 @@ function luckysheetextendtable(type, index, value, direction, sheetIndex) {
     // 否则按旧行号取数据会错位/取到刚 splice 的空行模板。lefttop 用 >=、rightbottom 用 >，
     // 与同文件 calcChain 的偏移规则一致；分别判断 [0]/[1]，与 borderInfo 的处理风格一致。
     // 用 Set 去重避免 cs 与 sr 共享 row/column 数组引用时被偏移两次（参见 selection.copy 实现）。
+    // 偏移前后做 deep-clone 快照并挂到 jfredo 最新 addRC 项的 copyShift，让撤销/重做能按 identity 校验后回滚。
     {
         const cs = Store.luckysheet_copy_save;
         const csShift = cs && Array.isArray(cs.copyRange) && cs.copyRange.length > 0 && cs.dataSheetIndex == sheetIndex;
         const isCurrent = file.index == Store.currentSheetIndex;
         const sr = isCurrent ? Store.luckysheet_selection_range : file.luckysheet_selection_range;
         const srShift = Array.isArray(sr) && sr.length > 0;
+        const willShift = (csShift || srShift) && (direction === "lefttop" || direction === "rightbottom");
+        // 与 jfrefreshgrid_adRC 写 jfredo 的闸门一致（refresh.js: Store.clearjfundo），避免 restore/导入时挂壳
+        const willPushHistory = willShift && isCurrent && Store.clearjfundo;
 
-        if ((csShift || srShift) && (direction === "lefttop" || direction === "rightbottom")) {
+        if (willShift) {
+            const cloneRanges = ranges => ranges.map(r => ({
+                row: [r.row[0], r.row[1]],
+                column: [r.column[0], r.column[1]],
+            }));
+
+            const csRef = csShift ? cs : null;
+            const srRef = srShift ? sr : null;
+            const prevCs = (willPushHistory && csShift) ? cloneRanges(cs.copyRange) : null;
+            const prevSr = (willPushHistory && srShift) ? cloneRanges(sr) : null;
+
             const useGE = direction === "lefttop";
             const shift = (v) => useGE ? (v >= index ? v + value : v) : (v > index ? v + value : v);
 
@@ -944,6 +958,15 @@ function luckysheetextendtable(type, index, value, direction, sheetIndex) {
             if (csShift) cs.copyRange.forEach(r => arrays.add(type === "row" ? r.row : r.column));
             if (srShift) sr.forEach(r => arrays.add(type === "row" ? r.row : r.column));
             arrays.forEach(arr => { arr[0] = shift(arr[0]); arr[1] = shift(arr[1]); });
+
+            if (willPushHistory) {
+                const curCs = csShift ? cloneRanges(cs.copyRange) : null;
+                const curSr = srShift ? cloneRanges(sr) : null;
+                const lastRedo = Store.jfredo[Store.jfredo.length - 1];
+                if (lastRedo && lastRedo.type === "addRC") {
+                    lastRedo.copyShift = { csRef, srRef, prevCs, curCs, prevSr, curSr };
+                }
+            }
 
             if (srShift && isCurrent) selectionCopyShow();
         }

@@ -23,8 +23,26 @@ import {
 } from '../global/refresh';
 import { getSheetIndex } from '../methods/get';
 import Store from '../store';
-import { selectHightlightShow } from './select';
+import { selectHightlightShow, selectionCopyShow } from './select';
 import method from '../global/method';
+
+// 配合 luckysheetextendtable 的偏移快照：撤销/重做 addRC 后，按 identity 校验回滚 cs.copyRange 与 selection_range，
+// 让"插入复制行/插入空行"的偏移与 flowdata 同步进退。校验失败（用户中途清/换 cs）则跳过，避免覆盖当前复制态。
+function restoreCopyShift(snapshot, kind) {
+    if (snapshot == null) return;
+
+    const cs = Store.luckysheet_copy_save;
+    if (cs !== snapshot.csRef) return;
+
+    const cList = kind === "prev" ? snapshot.prevCs : snapshot.curCs;
+    if (cList == null) return;
+    cs.copyRange = cList;
+
+    const sList = kind === "prev" ? snapshot.prevSr : snapshot.curSr;
+    if (sList == null) return;
+    Store.luckysheet_selection_range = sList;
+    selectionCopyShow();
+}
 
 function formulaHistoryHanddler(ctr, type="redo"){
     if(ctr==null){
@@ -178,6 +196,8 @@ const controlHistory = {
                 ctr.dataVerification,
                 ctr.hyperlink
             );
+
+            restoreCopyShift(ctr.copyShift, "prev");
         }
         else if (ctr.type == "delRC") { //删除行列撤销操作
             let ctrlValue = $.extend(true, {}, ctr.ctrlValue);
@@ -527,6 +547,8 @@ const controlHistory = {
                 ctr.curDataVerification,
                 ctr.curHyperlink
             );
+
+            restoreCopyShift(ctr.copyShift, "cur");
         }
         else if (ctr.type == "delRC") { //删除行列重做操作
             jfrefreshgrid_adRC(

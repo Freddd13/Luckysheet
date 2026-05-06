@@ -13,6 +13,15 @@
   - 顺带修复了同源隐藏 bug：先 Ctrl+C → 在源行之前插入空行/列 → Ctrl+V 错位（之前会按旧行号取已偏移 flowdata 的空模板），现在自动正确。
   - 影响：所有 `luckysheetextendtable` 入口（菜单插入空行/列、API、拖底加行、sheetmanage 内调用）零行为漂移；性能纯加性 0（用户无复制态时短路）。
 
+### 2026-05-06 followup（cut 标准语义 + 撤销/重做正确性）
+- cut 路径恢复 Excel "剪切+插入"的标准移动语义：
+  - `src/controllers/rowColumnOperation.js`：`insertRowsThenPasteCopySave` 在 `luckysheetextendtable` 之后，cut 模式下给末尾 `select_save` 补 `row_focus = row[0]` / `column_focus = column[0]`（值与 `row[1]/column[1]` 推算完全一致），随后调 `pasteHandlerOfCutPaste`，让其内部"清源 + 写目标"的循环正确生效；之后 `paste_iscut = false` + `clearcopy()` 维持一次性语义。copy 路径保持调 `pasteHandlerOfCopyPaste` 不变。
+- 撤销/重做联动 cs/sr 偏移（防止撤销后 Ctrl+V 错位）：
+  - `src/global/extend.js`：偏移块在偏移**前**对 `cs.copyRange` / `sr` 做 deep-clone 出 `prevCs/prevSr` 并保留对象引用 `csRef/srRef`；偏移**后**再 deep-clone 出 `curCs/curSr`；闸门为 `willPushHistory = isCurrent && Store.clearjfundo`（与 `jfrefreshgrid_adRC` 写 jfredo 的条件一致）。仅当 `Store.jfredo` 顶项 `type === "addRC"` 时把 `{csRef, srRef, prevCs, curCs, prevSr, curSr}` 挂到 `copyShift` 字段。
+  - `src/controllers/controlHistory.js`：新增模块级 `restoreCopyShift(snapshot, kind)`，按 `Store.luckysheet_copy_save === snapshot.csRef` 做 identity 校验后才回滚 `cs.copyRange`，sr 跟随 cs 一起恢复（巧妙避开 cut 路径 `clearcopy()` 把 sr 引用换新导致引用对不上的问题——`clearcopy` 不动 cs）。addRC 撤销分支末尾调 `restoreCopyShift(ctr.copyShift, "prev")`，重做分支末尾调 `restoreCopyShift(ctr.copyShift, "cur")`。
+  - identity 校验保护用户中途清/换 cs 的场景：若 `Store.luckysheet_copy_save` 已不是当时那份对象，跳过恢复，绝不覆盖用户当前复制态。
+- 性能：每次 `luckysheetextendtable` 多 2-4 次小对象 `cloneRanges`（O(ranges 数)，通常 1-2），可忽略；非 currentSheet / 非 addRC / 无复制态路径全部短路，零开销。
+
 ## 2026-04-29
 - 「插入复制行」右键菜单拆为「在上方插入复制行」「在下方插入复制行」两项：
   - 4 个 locale (zh / zh_tw / en / es) 新增 `insertCopiedRowAbove` / `insertCopiedRowBelow` 文案（保留旧 `insertCopiedRow` 不删）。
