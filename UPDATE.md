@@ -1,5 +1,18 @@
 # 更新记录
 
+## 2026-05-06
+- 修复「插入复制行」经常变空行的 bug（根因下沉重写，取代当日早前的局部副本方案）：
+  - 根因层次：
+    1. 数据层：`Store.luckysheet_copy_save.copyRange` 在 `luckysheetextendtable` 偏移 flowdata 时未联动偏移；
+    2. 视觉层：`Store.luckysheet_selection_range`（虚线框 DOM 数据源）同样未联动偏移；
+    3. 语义层：cut→copy 路径合并后丢了"剪切一次性"语义，闪烁框残留且后续 Ctrl+V 会按旧行号取错位。
+  - 修法（一次到位、覆盖所有 `luckysheetextendtable` 入口）：
+    1. `src/global/extend.js`：`luckysheetextendtable` 末尾对 `Store.luckysheet_copy_save.copyRange`（限同 sheet）与 `selection_range`（currentSheet 时取 `Store`、否则取 `file`）统一偏移；用 `Set` 收集 row/column 数组去重，避免 cs 与 sr 共享引用时偏移两次；偏移规则与 calcChain 一致：`lefttop` 用 `>=`、`rightbottom` 用 `>`，分别判断 [0]/[1]；`direction` 非合法值（`undefined` / `true`）时整段跳过，与 calcChain 双分支语义对齐；currentSheet 时显式调 `selectionCopyShow()` 重画虚线框 DOM。
+    2. `src/controllers/rowColumnOperation.js`：新增独立 helper `isCopiedRowInsertCrossing(st_index, direction)` 拦截"复制源跨越插入点"场景（lefttop: `row[0] < st_index && row[1] >= st_index`；rightbottom: `row[0] <= st_index && row[1] > st_index`），跨越时复用 `noPaste` 文案；`insertCopiedRows` 内 `canPasteCopySave` 增加该判定。
+    3. `src/controllers/rowColumnOperation.js`：`insertRowsThenPasteCopySave` 删除原临时副本偏移（已被根因取代），直接把 `Store.luckysheet_copy_save` 传给 `pasteHandlerOfCopyPaste`；末尾若操作前是 cut 态，则 `paste_iscut=false` + `selection.clearcopy()`，与 `handler.js` 现有 cut 路径顺序一致，符合 Excel 剪切一次性语义。
+  - 顺带修复了同源隐藏 bug：先 Ctrl+C → 在源行之前插入空行/列 → Ctrl+V 错位（之前会按旧行号取已偏移 flowdata 的空模板），现在自动正确。
+  - 影响：所有 `luckysheetextendtable` 入口（菜单插入空行/列、API、拖底加行、sheetmanage 内调用）零行为漂移；性能纯加性 0（用户无复制态时短路）。
+
 ## 2026-04-29
 - 「插入复制行」右键菜单拆为「在上方插入复制行」「在下方插入复制行」两项：
   - 4 个 locale (zh / zh_tw / en / es) 新增 `insertCopiedRowAbove` / `insertCopiedRowBelow` 文案（保留旧 `insertCopiedRow` 不删）。

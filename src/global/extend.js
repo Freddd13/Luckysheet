@@ -5,7 +5,7 @@ import { datagridgrowth, getcellFormula } from "./getdata";
 import { setcellvalue } from "./setdata";
 import conditionformat from "../controllers/conditionformat";
 import luckysheetFreezen from "../controllers/freezen";
-import { selectHightlightShow } from "../controllers/select";
+import { selectHightlightShow, selectionCopyShow } from "../controllers/select";
 import { luckysheet_searcharray } from "../controllers/sheetSearch";
 import { checkProtectionAuthorityNormal, checkProtectionNotEnable } from "../controllers/protection";
 import { getSheetIndex } from "../methods/get";
@@ -923,6 +923,30 @@ function luckysheetextendtable(type, index, value, direction, sheetIndex) {
     if (file.index == Store.currentSheetIndex) {
         Store.luckysheet_select_save = range;
         selectHightlightShow();
+    }
+
+    // 同步偏移复制态：cs.copyRange 与 selection_range 中的源行/列号必须跟随 flowdata 偏移，
+    // 否则按旧行号取数据会错位/取到刚 splice 的空行模板。lefttop 用 >=、rightbottom 用 >，
+    // 与同文件 calcChain 的偏移规则一致；分别判断 [0]/[1]，与 borderInfo 的处理风格一致。
+    // 用 Set 去重避免 cs 与 sr 共享 row/column 数组引用时被偏移两次（参见 selection.copy 实现）。
+    {
+        const cs = Store.luckysheet_copy_save;
+        const csShift = cs && Array.isArray(cs.copyRange) && cs.copyRange.length > 0 && cs.dataSheetIndex == sheetIndex;
+        const isCurrent = file.index == Store.currentSheetIndex;
+        const sr = isCurrent ? Store.luckysheet_selection_range : file.luckysheet_selection_range;
+        const srShift = Array.isArray(sr) && sr.length > 0;
+
+        if ((csShift || srShift) && (direction === "lefttop" || direction === "rightbottom")) {
+            const useGE = direction === "lefttop";
+            const shift = (v) => useGE ? (v >= index ? v + value : v) : (v > index ? v + value : v);
+
+            const arrays = new Set();
+            if (csShift) cs.copyRange.forEach(r => arrays.add(type === "row" ? r.row : r.column));
+            if (srShift) sr.forEach(r => arrays.add(type === "row" ? r.row : r.column));
+            arrays.forEach(arr => { arr[0] = shift(arr[0]); arr[1] = shift(arr[1]); });
+
+            if (srShift && isCurrent) selectionCopyShow();
+        }
     }
 
     if (type == "row") {

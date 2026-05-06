@@ -91,6 +91,19 @@ function isCopiedRowInsertTargetCompatible(copiedRowMeta) {
     return copiedRowMeta.sourceColumnLength === targetSheetFile.data[0].length;
 }
 
+// 判断"复制源是否跨越插入点"：跨越时简单偏移会拉伸/丢段（区间长度变化或源被空行模板穿插），
+// 必然错位，必须在入口拦截。仅同 sheet 时存在该问题。
+function isCopiedRowInsertCrossing(st_index, direction) {
+    const cs = Store.luckysheet_copy_save;
+    if (cs == null || !Array.isArray(cs.copyRange) || cs.copyRange.length === 0) return false;
+    if (cs.dataSheetIndex != Store.currentSheetIndex) return false;
+    for (const r of cs.copyRange) {
+        if (direction === "lefttop"     && r.row[0] <  st_index && r.row[1] >= st_index) return true;
+        if (direction === "rightbottom" && r.row[0] <= st_index && r.row[1] >  st_index) return true;
+    }
+    return false;
+}
+
 function canInsertCopiedRows(cellRightClickConfig) {
     if (!cellRightClickConfig.insertRow || !cellRightClickConfig.paste) {
         return false;
@@ -1521,13 +1534,16 @@ export function rowColumnOperationInitial() {
                 return;
             }
 
+            // 行号偏移由 luckysheetextendtable 内部统一处理（同步 cs.copyRange + selection_range）。
+            // 强行走 cut 分支（pasteHandlerOfCutPaste）会因新选区缺 row_focus/column_focus 让粘贴循环空转，
+            // 且其源清除循环按旧行号清已偏移 flowdata 会清错无关行；所以一律走 copy 路径。
+            const wasCut = Store.luckysheet_paste_iscut === true;
             luckysheetextendtable("row", st_index, copiedRowMeta.rowCount, direction);
-            if (Store.luckysheet_paste_iscut) {
+            selection.pasteHandlerOfCopyPaste(Store.luckysheet_copy_save);
+            if (wasCut) {
+                // 剪切是一次性语义：插入复制行已消耗了"延后移动"的语义，清掉剪切态与虚线框。
                 Store.luckysheet_paste_iscut = false;
-                selection.pasteHandlerOfCutPaste(Store.luckysheet_copy_save);
                 selection.clearcopy();
-            } else {
-                selection.pasteHandlerOfCopyPaste(Store.luckysheet_copy_save);
             }
         };
 
@@ -1567,7 +1583,10 @@ export function rowColumnOperationInitial() {
         };
 
         const copiedRowMeta = getCopiedRowInsertMeta();
-        const canPasteCopySave = copiedRowMeta != null && isCopiedRowInsertTargetCompatible(copiedRowMeta);
+        const canPasteCopySave =
+            copiedRowMeta != null
+            && isCopiedRowInsertTargetCompatible(copiedRowMeta)
+            && !isCopiedRowInsertCrossing(st_index, direction);
 
         if (navigator.clipboard != null && typeof navigator.clipboard.read === "function") {
             navigator.clipboard
