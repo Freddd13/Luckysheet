@@ -1,3 +1,5 @@
+import viewDecorations from "./controllers/viewDecorations";
+import { getInstanceRevision } from './utils/instance';
 import defaultSetting from "./config.js";
 import { common_extend } from "./utils/util";
 import Store from "./store";
@@ -38,6 +40,7 @@ import { luckysheetextendData } from "./global/extend.js";
 import { initChat } from './demoData/chat.js'
 
 let luckysheet = {};
+let extendViewDecorations = {};
 
 // mount api
 // luckysheet.api = api;
@@ -48,15 +51,17 @@ luckysheet = common_extend(api, luckysheet);
 //创建luckysheet表格
 luckysheet.create = function (setting) {
     method.destroy();
+    const instanceRevision=getInstanceRevision();
     // Store original parameters for api: toJson
     Store.toJsonOptions = {};
     for (let c in setting) {
-        if (c !== "data") {
+        if (c !== "data" && c !== "viewDecorations") {
             Store.toJsonOptions[c] = setting[c];
         }
     }
 
     let extendsetting = common_extend(defaultSetting, setting);
+    extendViewDecorations = extendsetting.viewDecorations || {};
 
     let loadurl = extendsetting.loadUrl,
         menu = extendsetting.menu,
@@ -183,7 +188,8 @@ luckysheet.create = function (setting) {
         // luckysheetsizeauto();
         initialWorkBook();
     } else {
-        $.post(loadurl, { gridKey: server.gridKey }, function (d) {
+        const request=$.post(loadurl, { gridKey: server.gridKey }, function (d) {
+            if(getInstanceRevision()!==instanceRevision)return;
             let data = new Function("return " + d)();
             Store.luckysheetfile = data;
 
@@ -196,6 +202,8 @@ luckysheet.create = function (setting) {
                 server.openWebSocket();
             }
         });
+        Store.workbookLoadRequest=request;
+        request.always(()=>{if(Store.workbookLoadRequest===request)Store.workbookLoadRequest=null;});
     }
 
     initChat()
@@ -213,6 +221,20 @@ function initialWorkBook() {
     zoomInitial(); //zoom method initialization
     // printInitial(); //print initialization
     initListener();
+    if(document.fonts && document.fonts.addEventListener) {
+        Store.fontLoadHandler=()=>{Store.measureTextCache={};Store.measureTextCellInfoCache={};Store.cellOverflowMapCache={};luckysheetrefreshgrid();};
+        document.fonts.addEventListener("loadingdone",Store.fontLoadHandler);
+    }
+    viewDecorations.initialize(extendViewDecorations);
+    if (luckysheetConfigsetting.safeStrMode) {
+        const disabled="#luckysheet-icon-percent,#luckysheet-icon-fmt-decimal-decrease,#luckysheet-icon-fmt-decimal-increase,#luckysheet-icon-currency,#luckysheet-icon-fmt-other,#luckysheet-icon-function,#luckysheet-icon-function-menu,#luckysheet-icon-merge-button,#luckysheet-icon-merge-menu";
+        $(disabled).addClass("luckysheet-text-mode-disabled").attr({"aria-disabled":"true",title:"纯文本模式不支持此操作"});
+        const container=document.getElementById(Store.container);
+        Store.textModeClickHandler = function textModeClick(event) {
+            if(event.target.closest(disabled)){event.preventDefault();event.stopImmediatePropagation();}
+        };
+        container.addEventListener("click", Store.textModeClickHandler,true);
+    }
 }
 
 //获取所有表格数据

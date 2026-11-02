@@ -216,18 +216,14 @@ async function core_rollup() {
 }
 
 async function core() {
-
-    await require('esbuild').buildSync({
-        format: 'iife',
-        globalName: 'luckysheet',    
-        entryPoints: ['src/index.js'],
-        bundle: true,
-        minify: production,
-        banner: { js: banner },
-        target: ['es2015'],
-        sourcemap: true,
-        outfile: 'dist/luckysheet.umd.js',
-      })
+    const formats=[{suffix:"umd",format:"iife"},{suffix:"cjs",format:"cjs"},{suffix:"esm",format:"esm"}];
+    for(const output of formats) require('esbuild').buildSync({
+        format:output.format,
+        ...(output.format==="iife"?{globalName:'luckysheet'}:{}),
+        entryPoints:['src/index.js'], bundle:true, minify:production,
+        banner:{js:banner}, target:['es2015'], sourcemap:true,
+        outfile:'dist/luckysheet.'+output.suffix+'.js'
+    });
 }
 
 // According to the build tag in html, package js and css
@@ -295,7 +291,8 @@ function copyStaticCssImages(){
 }
 
 const dev = series(clean, parallel(pluginsCss, plugins, css, pluginsJs, copyStaticHtml, copyStaticFonts, copyStaticAssets, copyStaticImages, copyStaticExpendPlugins, copyStaticDemoData, copyStaticCssImages, core), watcher, serve);
-const build = series(clean, parallel(pluginsCss, plugins, css, pluginsJs, copyStaticHtml, copyStaticFonts, copyStaticAssets, copyStaticImages, copyStaticExpendPlugins, copyStaticDemoData, copyStaticCssImages, core));
+function manifest(done) { require("./scripts/build-manifest.cjs").buildManifest(); done(); }
+const build = series(clean, parallel(pluginsCss, plugins, css, pluginsJs, copyStaticHtml, copyStaticFonts, copyStaticAssets, copyStaticImages, copyStaticExpendPlugins, copyStaticDemoData, copyStaticCssImages, core), manifest);
 
 exports.dev = dev;
 exports.build = build;

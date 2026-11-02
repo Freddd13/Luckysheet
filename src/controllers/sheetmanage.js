@@ -1,3 +1,5 @@
+import { getInstanceRevision, deferForInstance } from "../utils/instance";
+import viewDecorations from "./viewDecorations";
 import { isEditMode } from "../global/validate";
 import cleargridelement from "../global/cleargridelement";
 import { getdatabyselectionD, getcellvalue, datagridgrowth, getcellFormula } from "../global/getdata";
@@ -261,33 +263,9 @@ const sheetmanage = {
         }
 
         // safemode--add new sheet-->str(optional)
-        if (luckysheetConfigsetting.safeStrMode) {
-          // set current sheet
-          if (sheetconfig.celldata.length === 0) {
-            for (let row = 0; row < sheetconfig.row; row++) {
-              for (let column = 0; column < sheetconfig.column; column++) {
-                sheetconfig.celldata.push({
-                  r: row,
-                  c: column,
-                  v: {
-                    v: null,
-                    ct: {
-                      fa: "@",
-                      t: "s",
-                    },
-                  },
-                });
-              }
-            }
-          } else {
-            for (let i = 0; i < sheetconfig.celldata.length; i++) {
-              if (sheetconfig.celldata[i].ct.t != "inlineStr") {
-                sheetconfig.celldata[i].ct.fa = "@";
-                sheetconfig.celldata[i].ct.t = "s";
-              }
-            }
-          }
-        }
+        // set current sheet
+        // 文本约束在写入入口执行，加载和空白工作表保持原有数据。
+
 
         Store.luckysheetfile.push(sheetconfig);
         
@@ -726,6 +704,7 @@ const sheetmanage = {
             Store.jfredo.push(removedsheet[0]);
         }
         // 钩子 sheetDeleteAfter
+        viewDecorations.remove(file.index);
         method.createHookFunction("sheetDeleteAfter", { sheet: file });
     },
     nulldata: null,
@@ -753,7 +732,10 @@ const sheetmanage = {
         if (file.data && file.data.length > 0) {
             for (let i = 0; i < data.length; i++) {
                 for (let j = 0; j < data[0].length; j++) {
-                    setcellvalue(i, j, data, data[i][j]);
+                    if(luckysheetConfigsetting.safeStrMode) {
+                        const value=data[i][j];
+                        if(value!=null && typeof value!=="object")data[i][j]={v:value,m:String(value),ct:typeof value==="string"?{fa:"@",t:"s"}:{fa:"General",t:typeof value==="boolean"?"b":"n"}};
+                    } else setcellvalue(i, j, data, data[i][j]);
                 }
             }
         } else {
@@ -770,7 +752,8 @@ const sheetmanage = {
                     if (c >= data[0].length) {
                         data = datagridgrowth(data, 0, c - data[0].length + 1);
                     }
-                    setcellvalue(r, c, data, v);
+                    if(luckysheetConfigsetting.safeStrMode)data[r][c]=v==null?null:typeof v==="object"?$.extend(true,{},v):{v:v,m:String(v),ct:typeof v==="string"?{fa:"@",t:"s"}:{fa:"General",t:typeof v==="boolean"?"b":"n"}};
+                    else setcellvalue(r, c, data, v);
                 }
             }
         }
@@ -878,6 +861,7 @@ const sheetmanage = {
         }
     },
     initialjfFile: function(menu, title) {
+        const instanceRevision=getInstanceRevision();
         // console.error("here needs safe init")
         let _this = this;
 
@@ -936,7 +920,7 @@ const sheetmanage = {
 
         luckysheetcreatedom(colwidth, rowheight, data, menu, title);
 
-        setTimeout(function() {
+        deferForInstance(function() {
             tooltip.createHoverTip(
                 "#luckysheet_info_detail",
                 ".luckysheet_info_detail_back, .luckysheet_info_detail_input, .luckysheet_info_detail_update",
@@ -966,6 +950,7 @@ const sheetmanage = {
             let cahce_key = key + "__qkcache";
 
             let ini = function() {
+                if(getInstanceRevision()!==instanceRevision)return;
                 file["load"] = "1";
 
                 _this.createSheet();
@@ -1023,11 +1008,11 @@ const sheetmanage = {
                     arrayRemoveItem(Store.asyncLoad, "core");
 
                     if (luckysheetConfigsetting.pointEdit) {
-                        setTimeout(function() {
+                        deferForInstance(function() {
                             Store.loadingObj.close();
                         }, 0);
                     } else {
-                        setTimeout(function() {
+                        deferForInstance(function() {
                             Store.loadingObj.close();
                         }, 500);
                     }
@@ -1072,7 +1057,8 @@ const sheetmanage = {
                         execF();
                         return;
                     }
-                    $.post(loadSheetUrl, { gridKey: server.gridKey, index: sheetindex.join(",") }, function(d) {
+                    const request=$.post(loadSheetUrl, { gridKey: server.gridKey, index: sheetindex.join(",") }, function(d) {
+                        if(getInstanceRevision()!==instanceRevision)return;
                         let dataset = new Function("return " + d)();
 
                         for (let item in dataset) {
@@ -1091,11 +1077,14 @@ const sheetmanage = {
 
                         execF();
                     });
+                    Store.initialSheetLoadRequest=request;
+                    request.always(()=>{if(Store.initialSheetLoadRequest===request)Store.initialSheetLoadRequest=null;});
                 }
             };
 
             try {
                 localforage.getItem(cahce_key).then(function(readValue) {
+                    if(getInstanceRevision()!==instanceRevision)return;
                     if (readValue != null) {
                         _this.CacheNotLoadControll = readValue;
                     }

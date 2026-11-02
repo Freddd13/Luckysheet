@@ -4,6 +4,7 @@ import { genarate, update } from "./format";
 import server from "../controllers/server";
 import luckysheetConfigsetting from "../controllers/luckysheetConfigsetting";
 import Store from "../store/index";
+import { textCell } from "../utils/textCell";
 
 //Set cell value
 function setcellvalue(r, c, d, v) {
@@ -15,6 +16,13 @@ function setcellvalue(r, c, d, v) {
     let cell = d[r][c];
 
     let vupdate;
+
+    if (luckysheetConfigsetting.safeStrMode) {
+        const incoming = v && typeof v === "object" ? v : { v };
+        const next = textCell({ ...(cell && typeof cell === "object" ? cell : {}), ...incoming });
+        d[r][c] = next;
+        return next;
+    }
 
     if (getObjType(v) == "object") {
         if (cell == null) {
@@ -215,6 +223,17 @@ function setcellvalue(r, c, d, v) {
     return cell;
 }
 
+function setFormulaResult(r, c, data, result) {
+    const previous = data[r][c] || {};
+    const value = result.v, format = previous.ct && previous.ct.fa || "General";
+    const type = typeof value === "number" ? "n" : typeof value === "boolean" ? "b" : valueIsError(value) ? "e" : "s";
+    // 历史公式继续计算；结果以字符串存储，保留结果类型及显示格式供公式和渲染读取。
+    const cell = { ...previous, ...result, ct: { fa: format, t: type }, v: value == null ? value : String(value) };
+    cell.m = value == null ? "" : type === "n" ? String(update(format, value)) : type === "b" ? (value ? "TRUE" : "FALSE") : String(value);
+    data[r][c] = cell;
+    return cell;
+}
+
 //new runze 根据亿万格式autoFormatw和精确度accuracy 转换成 w/w0/w0.00 or 0/0.0格式
 function setAccuracy(autoFormatw, accuracy) {
     let acc = "0.";
@@ -259,4 +278,4 @@ function setAccuracy(autoFormatw, accuracy) {
     return fmt.toString();
 }
 
-export { setcellvalue, setAccuracy };
+export { setcellvalue, setFormulaResult, setAccuracy };

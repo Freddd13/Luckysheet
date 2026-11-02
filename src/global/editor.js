@@ -1,3 +1,4 @@
+import luckysheetConfigsetting from "../controllers/luckysheetConfigsetting";
 import browser from './browser';
 import formula from './formula';
 import { datagridgrowth } from './getdata';
@@ -7,17 +8,33 @@ import Store from '../store';
 
 const editor = {
     //worker+blob实现深拷贝替换extend
+    invalidateFlowDataCache() {
+        Store.measureTextCellInfoCache={}; Store.cellOverflowMapCache={};
+        this.deepCopyFlowDataState=false;
+        this.deepCopyFlowDataCache="";
+        this.flowDataCacheVersion=(this.flowDataCacheVersion||0)+1;
+        if(this.deepCopyFlowDataWorker) { this.deepCopyFlowDataWorker.terminate(); this.deepCopyFlowDataWorker=null; }
+    },
     deepCopyFlowDataState:false,
     deepCopyFlowDataCache:"",
     deepCopyFlowDataWorker:null,
-    deepCopyFlowData:function(flowData){
+    deepCopyFlowData:function(flowData, ranges){
         let _this = this;
+        if(ranges) {
+            const source=flowData||Store.flowdata, data=source.slice(), rows=new Set();
+            for(const range of ranges)for(let r=range.row[0];r<=Math.min(range.row[1],source.length-1);r++)rows.add(r);
+            rows.forEach(r=>{data[r]=$.extend(true,[],source[r]);});
+            return data;
+        }
 
-        if(_this.deepCopyFlowDataState){
+        if(_this.deepCopyFlowDataState && (flowData == null || flowData === Store.flowdata)){
             if(_this.deepCopyFlowDataWorker != null){
                 _this.deepCopyFlowDataWorker.terminate();  
             }
-            return _this.deepCopyFlowDataCache;
+            const cached=_this.deepCopyFlowDataCache;
+            _this.deepCopyFlowDataState=false;
+            _this.deepCopyFlowDataCache="";
+            return cached;
         }
         else{
             if(flowData == null){
@@ -28,7 +45,10 @@ const editor = {
         }
     },
     webWorkerFlowDataCache:function(flowData){
+        Store.measureTextCellInfoCache={}; Store.cellOverflowMapCache={};
         let _this = this;
+        if(luckysheetConfigsetting.safeStrMode){_this.invalidateFlowDataCache();return;}
+        const version=(_this.flowDataCacheVersion||0)+1; _this.flowDataCacheVersion=version;
 
         try{
             if(_this.deepCopyFlowDataWorker != null){//存新的webwork前先销毁以前的
@@ -52,6 +72,7 @@ const editor = {
             _this.deepCopyFlowDataWorker = worker;
             worker.postMessage(flowData);
             worker.onmessage = function(e) { 
+                if(_this.flowDataCacheVersion!==version) return;
                 _this.deepCopyFlowDataCache = e.data;
                 _this.deepCopyFlowDataState = true;
             };

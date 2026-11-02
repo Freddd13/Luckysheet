@@ -1,3 +1,5 @@
+import { officePalette } from "../utils/colorPalette";
+import { textModeMessage } from "./textInput";
 import { selectionCopyShow, selectIsOverlap } from "./select";
 import { luckyColor, iconfontObjects } from "./constant";
 import luckysheetConfigsetting from "./luckysheetConfigsetting";
@@ -51,7 +53,7 @@ import {
 import { openProtectionModal, checkProtectionFormatCells, checkProtectionNotEnable } from "./protection";
 import Store from "../store";
 import locale from "../locale/locale";
-import { checkTheStatusOfTheSelectedCells, frozenFirstRow, frozenFirstColumn } from "../global/api";
+import { checkTheStatusOfTheSelectedCells, frozenFirstRow, frozenFirstColumn, setHorizontalFrozen, setVerticalFrozen, setBothFrozen, cancelFrozen, cancelHorizontalFrozen, cancelVerticalFrozen } from "../global/api";
 
 const menuButton = {
   menu: '<div class="luckysheet-cols-menu luckysheet-rightgclick-menu luckysheet-menuButton ${subclass} luckysheet-mousedown-cancel" id="luckysheet-icon-${id}-menuButton">${item}</div>',
@@ -152,6 +154,12 @@ const menuButton = {
   luckysheetPaintSingle: false,
   initialMenuButton: function () {
     let _this = this;
+    $(document).off("keydown.luckysheetPalette").on("keydown.luckysheetPalette", function(event) {
+      if(event.key !== "Escape")return;
+      const palettes=$("body > .luckysheet-cols-menu:visible").filter(function(){return $(this).find(".sp-container").length>0;});
+      if(!palettes.length)return;
+      palettes.hide();event.preventDefault();luckysheetContainerFocus();
+    });
 
     //格式刷
     $("#luckysheet-icon-paintformat").click(function (e) {
@@ -373,14 +381,14 @@ const menuButton = {
 
     //货币格式
     $("#luckysheet-icon-currency").click(function () {
-      let d = editor.deepCopyFlowData(Store.flowdata); //取数据
+      let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save); //取数据
 
       _this.updateFormat(d, "ct", "¥ #.00");
     });
 
     //百分比
     $("#luckysheet-icon-percent").click(function () {
-      let d = editor.deepCopyFlowData(Store.flowdata); //取数据
+      let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save); //取数据
 
       _this.updateFormat(d, "ct", "0.00%");
     });
@@ -707,7 +715,7 @@ const menuButton = {
               .find(".luckysheet-toolbar-menu-button-caption")
               .html(" " + itemname + " ");
 
-            let d = editor.deepCopyFlowData(Store.flowdata);
+            let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
 
             _this.updateFormat(d, "ff", itemvalue);
           });
@@ -808,88 +816,7 @@ const menuButton = {
               color: luckysheetConfigsetting.defaultTextColor,
               noColorSelectedText: locale_toolbar.noColorSelectedText,
               localStorageKey: "spectrum.textcolor" + server.gridKey,
-              palette: [
-                [
-                  "#000",
-                  "#444",
-                  "#666",
-                  "#999",
-                  "#ccc",
-                  "#eee",
-                  "#f3f3f3",
-                  "#fff",
-                ],
-                [
-                  "#f00",
-                  "#f90",
-                  "#ff0",
-                  "#0f0",
-                  "#0ff",
-                  "#00f",
-                  "#90f",
-                  "#f0f",
-                ],
-                [
-                  "#f4cccc",
-                  "#fce5cd",
-                  "#fff2cc",
-                  "#d9ead3",
-                  "#d0e0e3",
-                  "#cfe2f3",
-                  "#d9d2e9",
-                  "#ead1dc",
-                ],
-                [
-                  "#ea9999",
-                  "#f9cb9c",
-                  "#ffe599",
-                  "#b6d7a8",
-                  "#a2c4c9",
-                  "#9fc5e8",
-                  "#b4a7d6",
-                  "#d5a6bd",
-                ],
-                [
-                  "#e06666",
-                  "#f6b26b",
-                  "#ffd966",
-                  "#93c47d",
-                  "#76a5af",
-                  "#6fa8dc",
-                  "#8e7cc3",
-                  "#c27ba0",
-                ],
-                [
-                  "#c00",
-                  "#e69138",
-                  "#f1c232",
-                  "#6aa84f",
-                  "#45818e",
-                  "#3d85c6",
-                  "#674ea7",
-                  "#a64d79",
-                ],
-                [
-                  "#900",
-                  "#b45f06",
-                  "#bf9000",
-                  "#38761d",
-                  "#134f5c",
-                  "#0b5394",
-                  "#351c75",
-                  "#741b47",
-                ],
-                [
-                  "#600",
-                  "#783f04",
-                  "#7f6000",
-                  "#274e13",
-                  "#0c343d",
-                  "#073763",
-                  "#20124d",
-                  "#4c1130",
-                ],
-              ],
+              palette: officePalette,
               change: function (color) {
                 let $input = $(this);
                 if (color != null) {
@@ -907,7 +834,7 @@ const menuButton = {
                 );
                 $("#luckysheet-icon-text-color").attr("color", color);
 
-                let d = editor.deepCopyFlowData(Store.flowdata);
+                let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
                 _this.updateFormat(d, "fc", color);
 
                 $menuButton.hide();
@@ -929,7 +856,7 @@ const menuButton = {
               "#luckysheet-icon-text-color .luckysheet-color-menu-button-indicator"
             ).css("border-bottom-color", "#000000");
 
-            let d = editor.deepCopyFlowData(Store.flowdata);
+            let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
             _this.updateFormat(d, "fc", null);
           });
 
@@ -1041,79 +968,7 @@ const menuButton = {
             clearText: locale_toolbar.clearText,
             noColorSelectedText: locale_toolbar.noColorSelectedText,
             localStorageKey: "spectrum.bgcolor" + server.gridKey,
-            palette: [
-              [
-                "#000",
-                "#444",
-                "#666",
-                "#999",
-                "#ccc",
-                "#eee",
-                "#f3f3f3",
-                "#fff",
-              ],
-              ["#f00", "#f90", "#ff0", "#0f0", "#0ff", "#00f", "#90f", "#f0f"],
-              [
-                "#f4cccc",
-                "#fce5cd",
-                "#fff2cc",
-                "#d9ead3",
-                "#d0e0e3",
-                "#cfe2f3",
-                "#d9d2e9",
-                "#ead1dc",
-              ],
-              [
-                "#ea9999",
-                "#f9cb9c",
-                "#ffe599",
-                "#b6d7a8",
-                "#a2c4c9",
-                "#9fc5e8",
-                "#b4a7d6",
-                "#d5a6bd",
-              ],
-              [
-                "#e06666",
-                "#f6b26b",
-                "#ffd966",
-                "#93c47d",
-                "#76a5af",
-                "#6fa8dc",
-                "#8e7cc3",
-                "#c27ba0",
-              ],
-              [
-                "#c00",
-                "#e69138",
-                "#f1c232",
-                "#6aa84f",
-                "#45818e",
-                "#3d85c6",
-                "#674ea7",
-                "#a64d79",
-              ],
-              [
-                "#900",
-                "#b45f06",
-                "#bf9000",
-                "#38761d",
-                "#134f5c",
-                "#0b5394",
-                "#351c75",
-                "#741b47",
-              ],
-              [
-                "#600",
-                "#783f04",
-                "#7f6000",
-                "#274e13",
-                "#0c343d",
-                "#073763",
-                "#20124d",
-                "#4c1130",
-              ],
-            ],
+            palette: officePalette,
             change: function (color) {
               let $input = $(this);
               if (color != null) {
@@ -1131,7 +986,7 @@ const menuButton = {
               );
 
               $("#luckysheet-icon-cell-color").attr("color", color);
-              let d = editor.deepCopyFlowData(Store.flowdata);
+              let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
               _this.updateFormat(d, "bg", color);
 
               $menuButton.hide();
@@ -1151,7 +1006,7 @@ const menuButton = {
             "#luckysheet-icon-cell-color .luckysheet-color-menu-button-indicator"
           ).css("border-bottom-color", "#ffffff");
 
-          let d = editor.deepCopyFlowData(Store.flowdata);
+          let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
           _this.updateFormat(d, "bg", null);
         });
 
@@ -1273,7 +1128,7 @@ const menuButton = {
             _this.focus($menuButton, itemvalue);
             $input.val(itemvalue);
 
-            let d = editor.deepCopyFlowData(Store.flowdata);
+            let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
             _this.updateFormat(d, "fs", itemvalue);
 
             clearTimeout(luckysheet_fs_setTimeout);
@@ -1320,7 +1175,7 @@ const menuButton = {
         let $menuButton = $("#luckysheet-icon-font-size-menuButton");
         _this.focus($menuButton, itemvalue);
 
-        let d = editor.deepCopyFlowData(Store.flowdata);
+        let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
         _this.updateFormat(d, "fs", itemvalue);
 
         luckysheet_fs_setTimeout = setTimeout(function () {
@@ -1848,79 +1703,7 @@ const menuButton = {
             clearText: locale_toolbar.clearText,
             noColorSelectedText: locale_toolbar.noColorSelectedText,
             localStorageKey: "spectrum.bordercolor" + server.gridKey,
-            palette: [
-              [
-                "#000",
-                "#444",
-                "#666",
-                "#999",
-                "#ccc",
-                "#eee",
-                "#f3f3f3",
-                "#fff",
-              ],
-              ["#f00", "#f90", "#ff0", "#0f0", "#0ff", "#00f", "#90f", "#f0f"],
-              [
-                "#f4cccc",
-                "#fce5cd",
-                "#fff2cc",
-                "#d9ead3",
-                "#d0e0e3",
-                "#cfe2f3",
-                "#d9d2e9",
-                "#ead1dc",
-              ],
-              [
-                "#ea9999",
-                "#f9cb9c",
-                "#ffe599",
-                "#b6d7a8",
-                "#a2c4c9",
-                "#9fc5e8",
-                "#b4a7d6",
-                "#d5a6bd",
-              ],
-              [
-                "#e06666",
-                "#f6b26b",
-                "#ffd966",
-                "#93c47d",
-                "#76a5af",
-                "#6fa8dc",
-                "#8e7cc3",
-                "#c27ba0",
-              ],
-              [
-                "#c00",
-                "#e69138",
-                "#f1c232",
-                "#6aa84f",
-                "#45818e",
-                "#3d85c6",
-                "#674ea7",
-                "#a64d79",
-              ],
-              [
-                "#900",
-                "#b45f06",
-                "#bf9000",
-                "#38761d",
-                "#134f5c",
-                "#0b5394",
-                "#351c75",
-                "#741b47",
-              ],
-              [
-                "#600",
-                "#783f04",
-                "#7f6000",
-                "#274e13",
-                "#0c343d",
-                "#073763",
-                "#20124d",
-                "#4c1130",
-              ],
-            ],
+            palette: officePalette,
             change: function (color) {
               let $input = $(this);
               if (color != null) {
@@ -2123,7 +1906,7 @@ const menuButton = {
         itemvalue = "left";
       }
 
-      let d = editor.deepCopyFlowData(Store.flowdata);
+      let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
       _this.updateFormat(d, "ht", itemvalue);
     });
 
@@ -2192,7 +1975,7 @@ const menuButton = {
                 iconfontObject[itemvalue]
             );
 
-          let d = editor.deepCopyFlowData(Store.flowdata);
+          let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
           _this.updateFormat(d, "ht", itemvalue);
         });
       }
@@ -2222,7 +2005,7 @@ const menuButton = {
         itemvalue = "bottom";
       }
 
-      let d = editor.deepCopyFlowData(Store.flowdata);
+      let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
       _this.updateFormat(d, "vt", itemvalue);
     });
 
@@ -2290,7 +2073,7 @@ const menuButton = {
                 iconfontObject[itemvalue]
             );
 
-          let d = editor.deepCopyFlowData(Store.flowdata);
+          let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
           _this.updateFormat(d, "vt", itemvalue);
         });
       }
@@ -2379,7 +2162,7 @@ const menuButton = {
                 iconfontObject[itemvalue]
             );
 
-          let d = editor.deepCopyFlowData(Store.flowdata);
+          let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
           _this.updateFormat(d, "tb", itemvalue);
         });
       }
@@ -2488,7 +2271,7 @@ const menuButton = {
                 iconfontObject[itemvalue]
             );
 
-          let d = editor.deepCopyFlowData(Store.flowdata);
+          let d = editor.deepCopyFlowData(Store.flowdata, Store.luckysheet_select_save);
           _this.updateFormat(d, "tr", itemvalue);
         });
       }
@@ -2511,6 +2294,9 @@ const menuButton = {
       );
     });
 
+    $("#luckysheet-freezen-btn-horizontal").on("click",()=>{
+      if(luckysheetFreezen.freezenhorizontaldata || luckysheetFreezen.freezenverticaldata)cancelFrozen();else frozenFirstRow();
+    });
     //冻结行列
     $("#luckysheet-icon-freezen-menu").click(function () {
       let menuButtonId = $(this).attr("id") + "-menuButton";
@@ -2544,6 +2330,8 @@ const menuButton = {
             example: "",
           },
           { text: "", value: "split", example: "" },
+          { text: "取消行冻结", value: "freezenCancelRow", example: "" },
+          { text: "取消列冻结", value: "freezenCancelColumn", example: "" },
           {
             text: locale_freezen.freezenCancel,
             value: "freezenCancel",
@@ -2571,509 +2359,74 @@ const menuButton = {
             itemvalue = $t.attr("itemvalue");
           _this.focus($menuButton, itemvalue);
           if (itemvalue === "freezenCancel") {
-            $menuButton.find(".fa.fa-check").remove();
-          }
+
+cancelFrozen();
+}
 
           // store frozen
-          luckysheetFreezen.saveFrozen(itemvalue);
+
 
           if (itemvalue == "freezenRow") {
-            //首行冻结
-            frozenFirstRow();
-            // let scrollTop = $("#luckysheet-cell-main").scrollTop();
-            // let row_st = luckysheet_searcharray(Store.visibledatarow, scrollTop);
-            // if(row_st == -1){
-            //     row_st = 0;
-            // }
-            // let top = Store.visibledatarow[row_st] - 2 - scrollTop + Store.columnHeaderHeight;
-            // let freezenhorizontaldata = [Store.visibledatarow[row_st], row_st + 1, scrollTop, luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1), top];
-            // luckysheetFreezen.saveFreezen(freezenhorizontaldata, top, null, null);
-
-            // if (luckysheetFreezen.freezenverticaldata != null) {
-            //     luckysheetFreezen.cancelFreezenVertical();
-            //     luckysheetFreezen.createAssistCanvas();
-            //     luckysheetrefreshgrid();
-            // }
-
-            // luckysheetFreezen.createFreezenHorizontal(freezenhorizontaldata, top);
-            // luckysheetFreezen.createAssistCanvas();
-            // luckysheetrefreshgrid();
-          } else if (itemvalue == "freezenColumn") {
-            //首列冻结
-            frozenFirstColumn();
-            // let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-            // let col_st = luckysheet_searcharray(Store.visibledatacolumn, scrollLeft);
-            // if(col_st == -1){
-            //     col_st = 0;
-            // }
-            // let left = Store.visibledatacolumn[col_st] - 2 - scrollLeft + Store.rowHeaderWidth;
-            // let freezenverticaldata = [Store.visibledatacolumn[col_st], col_st + 1, scrollLeft, luckysheetFreezen.cutVolumn(Store.visibledatacolumn, col_st + 1), left];
-            // luckysheetFreezen.saveFreezen(null, null, freezenverticaldata, left);
-
-            // if (luckysheetFreezen.freezenhorizontaldata != null) {
-            //     luckysheetFreezen.cancelFreezenHorizontal();
-            //     luckysheetFreezen.createAssistCanvas();
-            //     luckysheetrefreshgrid();
-            // }
-
-            // luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
-            // luckysheetFreezen.createAssistCanvas();
-            // luckysheetrefreshgrid();
-          } else if (itemvalue == "freezenRC") {
-            //首行列冻结
-            if (luckysheetFreezen.freezenRealFirstRowColumn) {
-              let row_st = 0;
-              let top =
-                Store.visibledatarow[row_st] - 2 + Store.columnHeaderHeight;
-              let freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top,
-              ];
-              luckysheetFreezen.saveFreezen(
-                freezenhorizontaldata,
-                top,
-                null,
-                null
-              );
-
-              luckysheetFreezen.createFreezenHorizontal(
-                freezenhorizontaldata,
-                top
-              );
-
-              let col_st = 0;
-              let left =
-                Store.visibledatacolumn[col_st] - 2 + Store.rowHeaderWidth;
-              let freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(
-                  Store.visibledatacolumn,
-                  col_st + 1
-                ),
-                left,
-              ];
-              luckysheetFreezen.saveFreezen(
-                null,
-                null,
-                freezenverticaldata,
-                left
-              );
-
-              luckysheetFreezen.createFreezenVertical(
-                freezenverticaldata,
-                left
-              );
-            } else {
-              let scrollTop = $("#luckysheet-cell-main").scrollTop();
-              let row_st = luckysheet_searcharray(
-                Store.visibledatarow,
-                scrollTop
-              );
-              if (row_st == -1) {
-                row_st = 0;
-              }
-              let top =
-                Store.visibledatarow[row_st] -
-                2 -
-                scrollTop +
-                Store.columnHeaderHeight;
-              let freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                scrollTop,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top,
-              ];
-              luckysheetFreezen.saveFreezen(
-                freezenhorizontaldata,
-                top,
-                null,
-                null
-              );
-
-              luckysheetFreezen.createFreezenHorizontal(
-                freezenhorizontaldata,
-                top
-              );
-
-              let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-              let col_st = luckysheet_searcharray(
-                Store.visibledatacolumn,
-                scrollLeft
-              );
-              if (col_st == -1) {
-                col_st = 0;
-              }
-              let left =
-                Store.visibledatacolumn[col_st] -
-                2 -
-                scrollLeft +
-                Store.rowHeaderWidth;
-              let freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                scrollLeft,
-                luckysheetFreezen.cutVolumn(
-                  Store.visibledatacolumn,
-                  col_st + 1
-                ),
-                left,
-              ];
-              luckysheetFreezen.saveFreezen(
-                null,
-                null,
-                freezenverticaldata,
-                left
-              );
-
-              luckysheetFreezen.createFreezenVertical(
-                freezenverticaldata,
-                left
-              );
-            }
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-          } else if (itemvalue == "freezenRowRange") {
-            //选区行冻结
-
-            if (
-              Store.luckysheet_select_save == null ||
-              Store.luckysheet_select_save.length == 0
-            ) {
-              if (isEditMode()) {
-                alert(locale_freezen.noSeletionError);
-              } else {
-                tooltip.info(locale_freezen.noSeletionError, "");
-              }
-
-              return;
-            }
-            // 固定超出屏幕范围
-            let rangeTop =
-              Store.luckysheet_select_save[
-                Store.luckysheet_select_save.length - 1
-              ].top;
-            if (
-              luckysheetFreezen.freezenRealFirstRowColumn &&
-              rangeTop > $("#luckysheet-cell-main").height()
-            ) {
-              return tooltip.info(
-                locale_freezen.rangeRCOverErrorTitle,
-                locale_freezen.rangeRCOverError
-              );
-            }
-            let scrollTop = $("#luckysheet-cell-main").scrollTop();
-            let row_st = luckysheet_searcharray(
-              Store.visibledatarow,
-              scrollTop
-            );
-
-            let last =
-              Store.luckysheet_select_save[
-                Store.luckysheet_select_save.length - 1
-              ];
-            let row_focus =
-              last["row_focus"] == null ? last["row"][0] : last["row_focus"];
-            row_st = Math.max(row_st - 1, row_focus - 1, 0);
-
-            let top, freezenhorizontaldata;
-            if (luckysheetFreezen.freezenRealFirstRowColumn) {
-              top = Store.visibledatarow[row_st] - 2 + Store.columnHeaderHeight;
-              freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top,
-              ];
-            } else {
-              top =
-                Store.visibledatarow[row_st] -
-                2 -
-                scrollTop +
-                Store.columnHeaderHeight;
-              freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                scrollTop,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top,
-              ];
-            }
-            luckysheetFreezen.saveFreezen(
-              freezenhorizontaldata,
-              top,
-              null,
-              null
-            );
-
-            if (luckysheetFreezen.freezenverticaldata != null) {
-              luckysheetFreezen.cancelFreezenVertical();
-              luckysheetFreezen.createAssistCanvas();
-              luckysheetrefreshgrid();
-            }
-
-            luckysheetFreezen.createFreezenHorizontal(
-              freezenhorizontaldata,
-              top
-            );
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-          } else if (itemvalue == "freezenColumnRange") {
-            //选区列冻结
-            if (
-              Store.luckysheet_select_save == null ||
-              Store.luckysheet_select_save.length == 0
-            ) {
-              if (isEditMode()) {
-                alert(locale_freezen.noSeletionError);
-              } else {
-                tooltip.info(locale_freezen.noSeletionError, "");
-              }
-
-              return;
-            }
-            // 固定超出屏幕范围
-            let rangeLeft =
-              Store.luckysheet_select_save[
-                Store.luckysheet_select_save.length - 1
-              ].left;
-            if (
-              luckysheetFreezen.freezenRealFirstRowColumn &&
-              rangeLeft > $("#luckysheet-cell-main").width()
-            ) {
-              return tooltip.info(
-                locale_freezen.rangeRCOverErrorTitle,
-                locale_freezen.rangeRCOverError
-              );
-            }
-            let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-            let col_st = luckysheet_searcharray(
-              Store.visibledatacolumn,
-              scrollLeft
-            );
-
-            let last =
-              Store.luckysheet_select_save[
-                Store.luckysheet_select_save.length - 1
-              ];
-            let column_focus =
-              last["column_focus"] == null
-                ? last["column"][0]
-                : last["column_focus"];
-            col_st = Math.max(col_st - 1, column_focus - 1, 0);
-
-            let left, freezenverticaldata;
-            if (luckysheetFreezen.freezenRealFirstRowColumn) {
-              left = Store.visibledatacolumn[col_st] - 2 + Store.rowHeaderWidth;
-              freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(
-                  Store.visibledatacolumn,
-                  col_st + 1
-                ),
-                left,
-              ];
-            } else {
-              left =
-                Store.visibledatacolumn[col_st] -
-                2 -
-                scrollLeft +
-                Store.rowHeaderWidth;
-              freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                scrollLeft,
-                luckysheetFreezen.cutVolumn(
-                  Store.visibledatacolumn,
-                  col_st + 1
-                ),
-                left,
-              ];
-            }
-            luckysheetFreezen.saveFreezen(
-              null,
-              null,
-              freezenverticaldata,
-              left
-            );
-
-            if (luckysheetFreezen.freezenhorizontaldata != null) {
-              luckysheetFreezen.cancelFreezenHorizontal();
-              luckysheetFreezen.createAssistCanvas();
-              luckysheetrefreshgrid();
-            }
-
-            luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-          } else if (itemvalue == "freezenRCRange") {
-            //选区行列冻结
-            if (
-              Store.luckysheet_select_save == null ||
-              Store.luckysheet_select_save.length == 0
-            ) {
-              if (isEditMode()) {
-                alert(locale_freezen.noSeletionError);
-              } else {
-                tooltip.info(locale_freezen.noSeletionError, "");
-              }
-
-              return;
-            }
-
-            // 固定超出屏幕范围
-            let rangeTop =
-              Store.luckysheet_select_save[
-                Store.luckysheet_select_save.length - 1
-              ].top;
-            let rangeLeft =
-              Store.luckysheet_select_save[
-                Store.luckysheet_select_save.length - 1
-              ].left;
-            if (
-              luckysheetFreezen.freezenRealFirstRowColumn &&
-              (rangeTop > $("#luckysheet-cell-main").height() ||
-                rangeLeft > $("#luckysheet-cell-main").width())
-            ) {
-              return tooltip.info(
-                locale_freezen.rangeRCOverErrorTitle,
-                locale_freezen.rangeRCOverError
-              );
-            }
-
-            let scrollTop = $("#luckysheet-cell-main").scrollTop();
-            let row_st = luckysheet_searcharray(
-              Store.visibledatarow,
-              scrollTop
-            );
-
-            let last =
-              Store.luckysheet_select_save[
-                Store.luckysheet_select_save.length - 1
-              ];
-            let row_focus =
-              last["row_focus"] == null ? last["row"][0] : last["row_focus"];
-            row_st = Math.max(row_st - 1, row_focus - 1, 0);
-
-            let top, freezenhorizontaldata;
-            if (luckysheetFreezen.freezenRealFirstRowColumn) {
-              top = Store.visibledatarow[row_st] - 2 + Store.columnHeaderHeight;
-              freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top,
-              ];
-              luckysheetFreezen.saveFreezen(
-                freezenhorizontaldata,
-                top,
-                null,
-                null
-              );
-            } else {
-              top =
-                Store.visibledatarow[row_st] -
-                2 -
-                scrollTop +
-                Store.columnHeaderHeight;
-              freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                scrollTop,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top,
-              ];
-              luckysheetFreezen.saveFreezen(
-                freezenhorizontaldata,
-                top,
-                null,
-                null
-              );
-            }
-
-            luckysheetFreezen.createFreezenHorizontal(
-              freezenhorizontaldata,
-              top
-            );
-
-            let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-            let col_st = luckysheet_searcharray(
-              Store.visibledatacolumn,
-              scrollLeft
-            );
-
-            let column_focus =
-              last["column_focus"] == null
-                ? last["column"][0]
-                : last["column_focus"];
-            col_st = Math.max(col_st - 1, column_focus - 1, 0);
-
-            let left, freezenverticaldata;
-            if (luckysheetFreezen.freezenRealFirstRowColumn) {
-              left = Store.visibledatacolumn[col_st] - 2 + Store.rowHeaderWidth;
-              freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(
-                  Store.visibledatacolumn,
-                  col_st + 1
-                ),
-                left,
-              ];
-            } else {
-              left =
-                Store.visibledatacolumn[col_st] -
-                2 -
-                scrollLeft +
-                Store.rowHeaderWidth;
-              freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                scrollLeft,
-                luckysheetFreezen.cutVolumn(
-                  Store.visibledatacolumn,
-                  col_st + 1
-                ),
-                left,
-              ];
-            }
-            luckysheetFreezen.saveFreezen(
-              null,
-              null,
-              freezenverticaldata,
-              left
-            );
-
-            luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
-
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-          } else if (itemvalue == "freezenCancel") {
-            //Cancel freezen
-            if (luckysheetFreezen.freezenverticaldata != null) {
-              luckysheetFreezen.cancelFreezenVertical();
-              luckysheetFreezen.createAssistCanvas();
-              luckysheetrefreshgrid();
-            }
-
-            if (luckysheetFreezen.freezenhorizontaldata != null) {
-              luckysheetFreezen.cancelFreezenHorizontal();
-              luckysheetFreezen.createAssistCanvas();
-              luckysheetrefreshgrid();
-            }
-
-            luckysheetFreezen.scrollAdapt();
-          }
+//首行冻结
+// let scrollTop = $("#luckysheet-cell-main").scrollTop();
+// let row_st = luckysheet_searcharray(Store.visibledatarow, scrollTop);
+// if(row_st == -1){
+//     row_st = 0;
+// }
+// let top = Store.visibledatarow[row_st] - 2 - scrollTop + Store.columnHeaderHeight;
+// let freezenhorizontaldata = [Store.visibledatarow[row_st], row_st + 1, scrollTop, luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1), top];
+// luckysheetFreezen.saveFreezen(freezenhorizontaldata, top, null, null);
+// if (luckysheetFreezen.freezenverticaldata != null) {
+//     luckysheetFreezen.cancelFreezenVertical();
+//     luckysheetFreezen.createAssistCanvas();
+//     luckysheetrefreshgrid();
+// }
+// luckysheetFreezen.createFreezenHorizontal(freezenhorizontaldata, top);
+// luckysheetFreezen.createAssistCanvas();
+// luckysheetrefreshgrid();
+frozenFirstRow();
+} else if (itemvalue == "freezenColumn") {
+//首列冻结
+// let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
+// let col_st = luckysheet_searcharray(Store.visibledatacolumn, scrollLeft);
+// if(col_st == -1){
+//     col_st = 0;
+// }
+// let left = Store.visibledatacolumn[col_st] - 2 - scrollLeft + Store.rowHeaderWidth;
+// let freezenverticaldata = [Store.visibledatacolumn[col_st], col_st + 1, scrollLeft, luckysheetFreezen.cutVolumn(Store.visibledatacolumn, col_st + 1), left];
+// luckysheetFreezen.saveFreezen(null, null, freezenverticaldata, left);
+// if (luckysheetFreezen.freezenhorizontaldata != null) {
+//     luckysheetFreezen.cancelFreezenHorizontal();
+//     luckysheetFreezen.createAssistCanvas();
+//     luckysheetrefreshgrid();
+// }
+// luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
+// luckysheetFreezen.createAssistCanvas();
+// luckysheetrefreshgrid();
+frozenFirstColumn();
+} else if (itemvalue == "freezenRC") {
+//首行列冻结
+setBothFrozen(false);
+} else if (itemvalue == "freezenRowRange") {
+//选区行冻结
+// 固定超出屏幕范围
+setHorizontalFrozen(true);
+} else if (itemvalue == "freezenColumnRange") {
+//选区列冻结
+// 固定超出屏幕范围
+setVerticalFrozen(true);
+} else if (itemvalue == "freezenRCRange") {
+//选区行列冻结
+// 固定超出屏幕范围
+setBothFrozen(true);
+} else if (itemvalue == "freezenCancelRow") {
+ cancelHorizontalFrozen();
+} else if (itemvalue == "freezenCancelColumn") {
+ cancelVerticalFrozen();
+} else if (itemvalue == "freezenCancel") {
+//Cancel freezen
+cancelFrozen();
+}
 
           setTimeout(function () {
             luckysheetsizeauto();
@@ -4563,6 +3916,8 @@ const menuButton = {
     col_st,
     col_ed
   ) {
+    if (luckysheetConfigsetting.safeStrMode && attr === "mc") return tooltip.info(textModeMessage, "");
+    if (luckysheetConfigsetting.safeStrMode && attr === "ct" && foucsStatus !== "@") return tooltip.info(textModeMessage, "");
     if (d == null || attr == null) {
       return;
     }
@@ -4768,6 +4123,7 @@ const menuButton = {
     jfrefreshgrid(d, Store.luckysheet_select_save, allParam, false);
   },
   updateFormat_mc: function (d, foucsStatus) {
+    if (luckysheetConfigsetting.safeStrMode && foucsStatus !== "mergeCancel") return tooltip.info(textModeMessage, "");
     // *如果禁止前台编辑，则中止下一步操作
     if (!checkIsAllowEdit()) {
       tooltip.info("", locale().pivotTable.errorNotAllowEdit);
@@ -5723,7 +5079,7 @@ const menuButton = {
   getTextHeightCache: {},
   getTextSize: function (text, font) {
     let fontarray = locale().fontarray;
-    let f = font || "10pt " + fontarray[0];
+    let f = font || Store.defaultFontSize + "pt " + fontarray[0];
 
     let _this = this;
 

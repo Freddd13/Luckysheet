@@ -1,0 +1,21 @@
+#luckysheet-freezebar-horizontal .luckysheet-freezebar-horizontal-drop-bar {
+    background: var(--luckysheet-freeze-color, #409eff);
+    height: 2px;
+    box-shadow: 0 2px 4px rgba(64,158,255,.22);
+}
+#luckysheet-freezebar-vertical .luckysheet-freezebar-vertical-drop-bar {
+    background: var(--luckysheet-freeze-color, #409eff);
+    width: 2px;
+    box-shadow: 2px 0 4px rgba(64,158,255,.22);
+}
+.luckysheet-operation-progress {
+    position: absolute; right: 20px; top: 70px; z-index: 1200;
+    padding: 10px 16px; background: #fff; border: 1px solid #dcdfe6;
+    border-radius: 4px; color: #606266; box-shadow: 0 2px 12px rgba(0,0,0,.12);
+}
+.luckysheet-operation-progress button { margin-left: 12px; color: #409eff; background: #fff; border: 1px solid #dcdfe6; border-radius: 3px; cursor: pointer; }
+.luckysheet-decoration-label { position: fixed; z-index: 1250; pointer-events: none; max-width: 200px; padding: 6px 10px; background: #303133; color: #fff; border-radius: 4px; font: 12px/1.5 Arial,"Microsoft YaHei",sans-serif; white-space: pre-wrap; box-shadow: 0 2px 8px rgba(0,0,0,.16); }
+.luckysheet-text-mode-disabled { opacity: .45; cursor: not-allowed; }
+.luckysheet-cols-menu .sp-palette-row:first-child::before { content: "主题颜色"; display: block; color: #606266; font-size: 12px; margin: 4px 2px 8px; }
+.luckysheet-cols-menu .sp-palette-row:nth-child(7)::before { content: "标准颜色"; display: block; color: #606266; font-size: 12px; margin: 12px 2px 8px; }
+.luckysheet-cols-menu .sp-thumb-el { border-radius: 2px; }

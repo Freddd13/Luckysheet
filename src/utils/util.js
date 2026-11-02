@@ -415,7 +415,7 @@ function luckysheetfontformat(format) {
         if (!format.fs) {
             font += Store.defaultFontSize + "pt ";
         } else {
-            font += Math.ceil(format.fs) + "pt ";
+            font += Number(format.fs) + "pt ";
         }
 
         if (!format.ff) {

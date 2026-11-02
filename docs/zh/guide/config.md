@@ -1,5 +1,57 @@
 # 整体配置
 
+## 业务组件的临时区域强调
+
+`viewDecorations` 按稳定的工作表 `index` 配置。每项使用独立 `id`，范围为零基闭区间：仅提供 `row` 时强调整行区块，仅提供 `column` 时强调整列，同时提供时强调矩形区域。
+
+```js
+luckysheet.create({
+  container: "luckysheet",
+  lang: "zh",
+  safeStrMode: true,
+  data: [{ name: "车次表", index: "runs", status: 1, order: 0,
+    row: 100, column: 20, config: {}, celldata: [] }],
+  viewDecorations: {
+    runs: [{ id: "configuration-a", range: { row: [2, 8] }, label: "构型 A",
+      style: { fill: "#ecf5ff", boundary: "#409eff", headerMarker: "#409eff" } }]
+  },
+  hook: {
+    sheetDataChanged(event) {
+      // 示例规则：根据第 A 列连续相同的构型名重新划分区块。
+      const info = luckysheet.getWorkbookInfo().sheets.find(s => s.sheetIndex === event.sheetIndex);
+      const groups = [];
+      let start = 1;
+      let name = luckysheet.getCellValue(start, 0, { order: info.order });
+      for (let row = start + 1; row <= info.rowCount; row++) {
+        const next = row < info.rowCount ? luckysheet.getCellValue(row, 0, { order: info.order }) : null;
+        if (next !== name || row === info.rowCount) {
+          if (name != null && name !== "") groups.push({
+            id: "block-" + start, range: { row: [start, row - 1] }, label: String(name),
+            style: { fill: "#ecf5ff", boundary: "#409eff", headerMarker: "#409eff" }
+          });
+          start = row; name = next;
+        }
+      }
+      luckysheet.setViewDecorations(groups, { sheetIndex: event.sheetIndex, revision: event.revision });
+    }
+  }
+});
+```
+
+示例遍历构型列供接入演示；实际业务应根据变更范围和构型规则缩小重算范围。异步计算完成后携带同一个 `revision` 提交，返回 `false` 表示数据已变化，需要重新计算。
+
+首次加载后的业务计算可放在 `hook.workbookReady(info)`，从 `info.sheets` 取得每表 `sheetIndex`、`order` 和 `revision`，再按上述方式提交强调。该 hook 只生成工作表元数据；需要完整快照的既有集成继续使用 `workbookCreateAfter`。
+
+`style.fill` 为浅底色，`boundary` 为边界色，`headerMarker` 为行列头标记色；支持 CSS 颜色值，传入 `null` 可关闭某种效果。默认使用浅蓝色。已有单元格、交替颜色及条件格式底色优先，重叠强调按后项优先；悬浮标签使用纯文字。样式只影响显示，不进入单元格、历史、剪贴板、协同消息及 `getAllSheets/toJson` 输出，销毁工作簿时释放。
+
+冻结边界可通过组件容器上的 CSS 变量调整：
+
+```css
+#luckysheet { --luckysheet-freeze-color: #409eff; }
+```
+
+生产接入仍启用 `safeStrMode:true`。该模式统一禁止新增合并，已有工作簿结构保留。原有 UMD 全局对象、DOM ID 和 CSS 类名继续保留；更新资源时 JS 与 CSS 配套替换。下游 XLSX 导出中的数字字体映射需要另行校正，组件端新字体设置使用名称以减少索引差异。
+
 ## 基础结构
 
 初始化表格时，可以设置一个对象配置串`options`来自定义配置Luckysheet表格。

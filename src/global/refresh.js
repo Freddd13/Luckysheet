@@ -1,3 +1,5 @@
+import viewDecorations from "../controllers/viewDecorations";
+import { deferForInstance, cancelForInstance } from "../utils/instance";
 import rhchInit from './rhchInit';
 import formula from './formula';
 import editor from './editor';
@@ -34,6 +36,7 @@ function runExecFunction(range, index, data){
     formula.execFunctionExist.reverse();
     formula.execFunctionGroup(null, null, null, null, data);
     formula.execFunctionGlobalData = null;
+    formula.groupValuesRefresh();
 }
 
 function jfrefreshgrid(data, range, allParam, isRunExecFunction = true, isRefreshCanvas = true) {
@@ -46,7 +49,7 @@ function jfrefreshgrid(data, range, allParam, isRunExecFunction = true, isRefres
     }
     range = JSON.parse(JSON.stringify(range));
 
-    clearTimeout(refreshCanvasTimeOut);
+    cancelForInstance(refreshCanvasTimeOut);
 
     //关联参数
     if(allParam == null){
@@ -144,14 +147,15 @@ function jfrefreshgrid(data, range, allParam, isRunExecFunction = true, isRefres
     }
 
     //condition format, null or empty array are not processed
-    if(cdformat != null && cdformat.length !== 0){
+    // 显式空集合用于撤销和模式切换时清除本次新增的规则。
+    if(cdformat != null){
         file["luckysheet_conditionformat_save"] = cdformat;
 
         server.saveParam("all", Store.currentSheetIndex, cdformat, { "k": "luckysheet_conditionformat_save" });
     }
 
     //data Verification, null or empty object are not processed
-    if(dataVerification != null && Object.keys(dataVerification).length !== 0){
+    if(dataVerification != null){
         dataVerificationCtrl.dataVerification = dataVerification;
         file["dataVerification"] = dataVerification;
         server.saveParam("all", Store.currentSheetIndex, dataVerification, { "k": "dataVerification" });
@@ -199,7 +203,8 @@ function jfrefreshgrid(data, range, allParam, isRunExecFunction = true, isRefres
     }
     //刷新表格
     if(isRefreshCanvas){
-        refreshCanvasTimeOut = setTimeout(function () {
+        cancelForInstance(refreshCanvasTimeOut);
+        refreshCanvasTimeOut = deferForInstance(function () {
             luckysheetrefreshgrid();
         }, 1);
     }
@@ -207,6 +212,8 @@ function jfrefreshgrid(data, range, allParam, isRunExecFunction = true, isRefres
     /* 选区同步 */
     selectHightlightShow();
     window.luckysheet_getcelldata_cache = null;
+
+if(Store.clearjfundo) viewDecorations.changed(Store.currentSheetIndex,range,allParam.operation || "edit");
 }
 
 function jfrefreshgridall(colwidth, rowheight, data, cfg, range, ctrlType, ctrlValue, cdformat, isRefreshCanvas=true) {
@@ -341,7 +348,8 @@ function jfrefreshgridall(colwidth, rowheight, data, cfg, range, ctrlType, ctrlV
     jfrefreshgrid_rhcw(rowheight, colwidth);
 
     if(isRefreshCanvas){
-        refreshCanvasTimeOut = setTimeout(function () {
+        cancelForInstance(refreshCanvasTimeOut);
+        refreshCanvasTimeOut = deferForInstance(function () {
             luckysheetrefreshgrid();
         }, 1);
     }
@@ -350,6 +358,8 @@ function jfrefreshgridall(colwidth, rowheight, data, cfg, range, ctrlType, ctrlV
     sheetmanage.storeSheetParamALL();
     
     window.luckysheet_getcelldata_cache = null;
+
+if(Store.clearjfundo) viewDecorations.changed(Store.currentSheetIndex,range,ctrlType || "format");
 }
 
 function jfrefreshrange(data, range, cdformat) {
@@ -609,6 +619,7 @@ function jfrefreshgrid_adRC(data, cfg, ctrlType, ctrlValue, calc, filterObj, cf,
         luckysheetFreezen.freezenverticaldata = null;
     }
 
+    luckysheetFreezen.syncFrozen();
     //数据验证
     dataVerificationCtrl.dataVerification = dataVerification;
     file.dataVerification = dataVerification;
@@ -621,6 +632,8 @@ function jfrefreshgrid_adRC(data, cfg, ctrlType, ctrlValue, calc, filterObj, cf,
 
     //行高、列宽刷新
     jfrefreshgrid_rhcw(Store.flowdata.length, Store.flowdata[0].length);
+
+if(Store.clearjfundo) viewDecorations.changed(Store.currentSheetIndex,null,ctrlType);
 }
 
 //删除单元格 刷新表格
@@ -826,6 +839,8 @@ function jfrefreshgrid_deleteCell(data, cfg, ctrl, calc, filterObj, cf, dataVeri
     refreshCanvasTimeOut = setTimeout(function () {
         luckysheetrefreshgrid();
     }, 1);
+
+if(Store.clearjfundo) viewDecorations.changed(Store.currentSheetIndex,null,"deleteCell");
 }
 
 //复制剪切 刷新表格
@@ -993,6 +1008,10 @@ function jfrefreshgrid_pastcut(source, target, RowlChange){
     server.saveParam("all", source["sheetIndex"], source["curDataVerification"], { "k": "dataVerification" });
     //目的表
     server.saveParam("all", target["sheetIndex"], target["curDataVerification"], { "k": "dataVerification" });
+
+    if(Store.clearjfundo) {
+        viewDecorations.changedMany(source.sheetIndex==target.sheetIndex ? [{sheetIndex:source.sheetIndex,ranges:[source.range,target.range],type:"cut"}] : [{sheetIndex:source.sheetIndex,ranges:[source.range],type:"cut"},{sheetIndex:target.sheetIndex,ranges:[target.range],type:"paste"}]);
+    }
 }
 
 //行高、列宽改变 刷新表格
@@ -1159,6 +1178,8 @@ function jfrefreshgrid_rhcw(rowheight, colwidth, isRefreshCanvas=true){
 
 //Refresh the canvas display data according to scrollHeight and scrollWidth
 function luckysheetrefreshgrid(scrollWidth, scrollHeight) {
+    if(!document.getElementById('luckysheetTableContent'))return;
+    viewDecorations.beginFrame();
     formula.groupValuesRefresh();
     
     if (scrollWidth == null) {
@@ -1337,6 +1358,7 @@ function luckysheetrefreshgrid(scrollWidth, scrollHeight) {
 }
 
 export {
+    runExecFunction,
     jfrefreshgrid,
     jfrefreshgridall,
     jfrefreshrange,

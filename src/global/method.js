@@ -1,3 +1,7 @@
+import luckysheetDropCell from "../controllers/dropCell";
+import viewDecorations from "../controllers/viewDecorations";
+import { cancelPendingScroll } from "./scroll";
+import { releaseInstance } from "../utils/instance";
 import server from '../controllers/server';
 import { luckysheetlodingHTML, luckyColor } from '../controllers/constant';
 import sheetmanage from '../controllers/sheetmanage';
@@ -429,6 +433,25 @@ const method = {
         sheetmanage.changeSheet(Store.luckysheetfile[0].index);
     },
     destroy:function(){
+        releaseInstance();
+        Store.toJsonOptions={};
+        luckysheetConfigsetting.hook={};
+        for(const key of ['workbookLoadRequest','initialSheetLoadRequest']){const request=Store[key];Store[key]=null;if(request)request.abort();}
+        viewDecorations.destroy();
+        luckysheetDropCell.reset();
+        cancelPendingScroll();
+        editor.invalidateFlowDataCache();
+        if(Store.fontLoadHandler && document.fonts){document.fonts.removeEventListener("loadingdone",Store.fontLoadHandler);Store.fontLoadHandler=null;}
+        if(Store.textModeClickHandler){const container=document.getElementById(Store.container);if(container)container.removeEventListener('click',Store.textModeClickHandler,true);Store.textModeClickHandler=null;}
+        $(window).off(".luckysheetEvent");
+        $(document).off(".dCtypeList");
+        $(document).off(".luckysheetPalette");
+        if(Store.container)$("#"+Store.container).off(".luckysheetEvent");
+        if(server.retryTimer){clearInterval(server.retryTimer);server.retryTimer=null;}
+        if(server.websocket){const socket=server.websocket;server.websocket=null;socket.onopen=null;socket.onerror=null;socket.onclose=null;socket.onmessage=null;socket.close(1000);}
+        for(const key of ["jfcountfuncTimeout","jfautoscrollTimeout","measureTextCacheTimeOut"])clearTimeout(Store[key]);
+
+        if($.fn.spectrum)$("body > .luckysheet-cols-menu .luckysheet-color-selected").spectrum("destroy");
         $("#" + Store.container).empty();
         $("body > .luckysheet-cols-menu").remove();
 

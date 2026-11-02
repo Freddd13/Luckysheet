@@ -243,10 +243,10 @@ function getCellTextSplitArr(strValue, strArr, cellWidth, canvas){
 // let measureTextCache = {}, measureTextCacheTimeOut = null;
 function getMeasureText(value, ctx, fontset){
 
-    let mtc = Store.measureTextCache[value + "_" + ctx.font];
-    if(fontset!=null){
-        mtc = Store.measureTextCache[value + "_" + fontset];
-    }
+    const previousFont=ctx.font;
+    const activeFont=fontset==null?previousFont:fontset;
+    const cacheKey=String(value)+"_"+Store.zoomRatio+"_"+ctx.textBaseline+"_"+activeFont;
+    let mtc = Store.measureTextCache[cacheKey];
 
     if(mtc != null){
         return mtc;
@@ -300,22 +300,24 @@ function getMeasureText(value, ctx, fontset){
 
         if(ctx.textBaseline == 'alphabetic'){
             let descText = "gjpqy", matchText="abcdABCD";
-            let descTextMeasure = Store.measureTextCache[descText + "_" + ctx.font];
+            let descTextMeasure = Store.measureTextCache["metrics_"+ctx.textBaseline+"_"+descText+"_"+activeFont];
             if(fontset!=null){
-                descTextMeasure = Store.measureTextCache[descText + "_" + fontset];
+                descTextMeasure = Store.measureTextCache["metrics_"+ctx.textBaseline+"_"+descText+"_"+activeFont];
             }
 
-            let matchTextMeasure = Store.measureTextCache[matchText + "_" + ctx.font];
+            let matchTextMeasure = Store.measureTextCache["metrics_"+ctx.textBaseline+"_"+matchText+"_"+activeFont];
             if(fontset!=null){
-                matchTextMeasure = Store.measureTextCache[matchText + "_" + fontset];
+                matchTextMeasure = Store.measureTextCache["metrics_"+ctx.textBaseline+"_"+matchText+"_"+activeFont];
             }
 
             if(descTextMeasure == null){
                 descTextMeasure = ctx.measureText(descText);
+                Store.measureTextCache["metrics_"+ctx.textBaseline+"_"+descText+"_"+activeFont]=descTextMeasure;
             }
 
             if(matchTextMeasure == null){
                 matchTextMeasure = ctx.measureText(matchText);
+                Store.measureTextCache["metrics_"+ctx.textBaseline+"_"+matchText+"_"+activeFont]=matchTextMeasure;
             }
 
             if(cache.actualBoundingBoxDescent<=matchTextMeasure.actualBoundingBoxDescent){
@@ -331,7 +333,8 @@ function getMeasureText(value, ctx, fontset){
         cache.width *= Store.zoomRatio;
         cache.actualBoundingBoxDescent *= Store.zoomRatio;
         cache.actualBoundingBoxAscent *= Store.zoomRatio;
-        Store.measureTextCache[value + "_" + Store.zoomRatio +  "_" + ctx.font] = cache;
+        Store.measureTextCache[cacheKey] = cache;
+        if(fontset!=null)ctx.font=previousFont;
         // console.log(measureText, value);
         return cache;
     }
@@ -350,17 +353,27 @@ function isSupportBoundingBox(ctx){
 // let measureTextCache = {}, measureTextCacheTimeOut = null;
 // option {cellWidth,cellHeight,space_width,space_height}
 function getCellTextInfo(cell , ctx, option){
+    const entries = Store.measureTextCellInfoCache.entries || (Store.measureTextCellInfoCache.entries = new Map());
+    const key = [option.r,option.c,option.cellWidth,option.cellHeight,option.space_width,option.space_height,Store.zoomRatio,Store.defaultFontSize,Store.lang].join('_');
+    const cached = entries.get(key);
+    if(cached && cached.cell === cell) {
+        ctx.font=cached.font;ctx.textAlign=cached.align;ctx.textBaseline=cached.baseline;
+        return cached.value;
+    }
+    const value = computeCellTextInfo(cell,ctx,option);
+    // 限制连续滚动时的布局缓存，并保存布局计算对 Canvas 字体状态的影响。
+    if(entries.size>=4096)entries.delete(entries.keys().next().value);
+    entries.set(key,{cell,value,font:ctx.font,align:ctx.textAlign,baseline:ctx.textBaseline});
+    return value;
+}
+
+function computeCellTextInfo(cell , ctx, option){
     let cellWidth = option.cellWidth;
     let cellHeight = option.cellHeight;
-    let isMode = "", isModeSplit = "";
+    let isMode = "";
     // console.log("initialinfo", cell, option);
     if(cellWidth==null){
         isMode = "onlyWidth";
-        isModeSplit = "_";
-    }
-    let textInfo = Store.measureTextCellInfoCache[option.r + "_" + option.c + isModeSplit + isMode];
-    if(textInfo != null){
-        return textInfo;
     }
 
     // let cell = Store.flowdata[r][c];

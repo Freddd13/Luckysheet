@@ -1,3 +1,4 @@
+import viewDecorations from "./viewDecorations";
 import sheetmanage from './sheetmanage';
 import server from './server';
 import pivotTable from './pivotTable';
@@ -463,7 +464,11 @@ const controlHistory = {
         // 钩子函数
         method.createHookFunction('updated', newCtr)
         
-    },
+
+        if(ctr.type==='pasteCut') {
+            viewDecorations.changedMany(ctr.source.sheetIndex==ctr.target.sheetIndex ? [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range,ctr.target.range],type:'undo'}] : [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range],type:'undo'},{sheetIndex:ctr.target.sheetIndex,ranges:[ctr.target.range],type:'undo'}]);
+        } else viewDecorations.changed(Store.currentSheetIndex,ctr.type==='datachange'?null:ctr.range,"undo");
+},
     undo: function () {
         if (Store.jfundo.length == 0) {
             return;
@@ -782,7 +787,11 @@ const controlHistory = {
         }
         Store.clearjfundo = true;
 
-    }
+
+        if(ctr.type==='pasteCut') {
+            viewDecorations.changedMany(ctr.source.sheetIndex==ctr.target.sheetIndex ? [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range,ctr.target.range],type:'redo'}] : [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range],type:'redo'},{sheetIndex:ctr.target.sheetIndex,ranges:[ctr.target.range],type:'redo'}]);
+        } else viewDecorations.changed(Store.currentSheetIndex,ctr.type==='datachange'?null:ctr.range,"redo");
+}
 };
 
 export default controlHistory;

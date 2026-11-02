@@ -1,5 +1,50 @@
 # API
 
+## 业务组件接口（2026-11）
+
+所有行列坐标从 0 开始，范围的两个端点均包含。旧 API 的 `options.order` 是工作表在列表中的位置；新增区域强调接口的 `sheetIndex` 是工作表的稳定标识。通过 `getWorkbookInfo()` 获取对应关系，切表或重排行后重新取得 `order`。
+
+| 能力 | 接口 | 返回值、时机与成本 |
+| --- | --- | --- |
+| 工作表身份 | `getWorkbookInfo()` | `{ activeSheetIndex, sheets: [{ sheetIndex, order, name, revision, rowCount, columnCount, active }] }`；独立元数据，成本与工作表数量相关 |
+| 选区 | `getRange()`、`getRangeAxis()` | 当前选区副本与地址；使用时取得最新选区 |
+| 编辑提交 | `exitEditMode({success})`、`enterEditMode()` | 前者同步提交正在编辑的内容；`cellUpdated` 延后通知。前置 hook 可拦截提交，`success` 回调沿用调用完成语义 |
+| 单格读取 | `getCellValue(r,c,{order,type:'v'})` | 原始值；`type:'m'` 为显示内容，历史数据可能保留数值类型 |
+| 范围读取 | `getRangeValue({order,range})` | 单元格副本；仅复制请求范围，沿用跳过隐藏行的行为。需要隐藏行和准确坐标时按坐标调用 `getCellValue` |
+| 工作簿快照 | `getSheetData({order})`、`getAllSheets()`、`toJson()` | 完整副本；大表成本较高，避免用于滚动或逐次鼠标事件 |
+| 单格/范围写入 | `setCellValue`、`setRangeValue` | 文本模式下返回成功布尔值；超过 10000 格的范围写入返回 `Promise<boolean>`，可取消，完成后统一提交 |
+| 结构与格式 | `insertRow`、`insertRowBottom`、`insertColumn`、`deleteRow`、`deleteColumn`、`setCellFormat`、`setRangeFormat` | 使用既有参数和保护规则；常用范围格式整批提交、一次撤销，保留历史数值、显示值和公式；大范围格式更新也需等待返回的 Promise |
+| 冻结 | `setHorizontalFrozen`、`setVerticalFrozen`、`setBothFrozen` | `isRange:true` 的目标行列包含在冻结区内，单轴设置保留另一轴；`range` 省略时取当前焦点 |
+| 取消冻结 | `cancelHorizontalFrozen({order})`、`cancelVerticalFrozen({order})`、`cancelFrozen(order)` | 分别取消一轴或全部取消 |
+| 历史 | `undo()`、`redo()` | 恢复操作前后快照；一次填充及其模式切换占一次历史记录 |
+| 临时区域强调 | `setViewDecorations(items,{sheetIndex,revision})`、`getViewDecorations({sheetIndex})`、`clearViewDecorations({sheetIndex})` | 独立运行时状态；查询返回副本；过期 `revision` 的更新返回 `false` |
+
+`safeStrMode:true` 下，新输入、粘贴、填充及值写入保持字符串内容，保留前导零、长整数、空格、换行、百分号、单引号和等号。历史单元格原样加载，已有公式保留计算行为。字体、颜色等外观仍可设置；新增公式对象、合并和数字格式会被拒绝。合并来源粘贴提供明确的展开操作，展开后仅保留左上角内容。
+
+历史公式重算后的非空 `v` 也保存为字符串，保留 `f`、结果类型和显示格式。提交后读取和通知均可取得最新计算结果；撤销恢复原快照中保存的值与类型。
+
+小范围值写入同步完成；大范围写入应等待返回的 Promise 或使用 `success` 回调后再读取。取消、保护拦截、数据验证失败及异步准备期间工作表数据变化时不提交。`setCellValue({isRefresh:false})` 沿用不单独创建历史记录的行为；需要批量撤销时使用 `setRangeValue`。旧参数校验失败可能返回 `undefined`，适配层应将非成功结果视为失败，避免仅凭未抛异常判断成功。
+
+`type:'m'` 在历史单元格未保存 `m` 时回退到文字内容。`yyyy-MM-dd` 历史格式沿用原接口的显示值特例，读取完整单元格对象可取得其原始 `v`。格式接口用于外观设置；内容通过值接口写入。格式对象未提供新内容时保留原值及公式。
+
+| Hook | 用途与约定 |
+| --- | --- |
+| `workbookCreateAfter`、`sheetActivate` | 创建完成、切换工作表；保留既有参数 |
+| `workbookReady` | `(info)`，每个组件实例就绪后通知一次，参数与 `getWorkbookInfo()` 相同；适合 MCP 初始化，避免创建全表快照。旧 `workbookCreateAfter` 仅在注册时生成完整快照 |
+| `cellEditBefore`、`cellUpdateBefore`、`cellUpdated` | 编辑进入、写入前拦截、写入后通知；前置 hook 返回 `false` 可拦截，整批值写入先检查全部目标 |
+| `rangeSelect`、`sheetMouseup` | 选区及鼠标操作；保留业务现有悬浮工具栏使用的参数 |
+| `rangePasteBefore` | 处理剪贴板前拦截，原始内容及参数保持原约定 |
+| `rowInsertBefore`、`rowDeleteBefore` | 既有行列结构操作拦截点；接口与菜单覆盖范围以各接口说明为准 |
+| `updated` | 保留旧历史记录通知；部分路径发生在提交前，读取新数据请使用下面的新 hook |
+| `sheetDataChanged` | `({sheetIndex,ranges,type,revision})`，操作提交后触发；包含编辑、批量写入、粘贴、填充、插删、排序、撤销重做及协同应用。`ranges:null` 表示整表或结构变化 |
+| `cellRenderBefore/After`、行列标题渲染 hook | Canvas 扩展；每次绘制可能多次调用，保持轻量 |
+
+`sheetDataChanged` 发出前会使该表旧区域强调失效。业务根据已提交数据重新计算，再携带事件中的 `revision` 更新强调。版本号也区分重新创建的工作簿，避免旧异步结果覆盖新界面。外观操作也可能触发通知，业务可按 `type`、`ranges` 减少重算范围。
+
+一次操作对每个受影响工作表通知一次，范围包含该表实际改变的公式结果；跨表派生结果使用 `type:'formula'`。后台重算的通知在结果应用后合并到下一次任务。`revision` 单调递增，可跳号；只与同一 `sheetIndex` 的版本比较。准备中的异步写入遇到协同修改、其他提交或实例销毁时返回 `false`。
+
+MCP 适配建议使用元数据、有限范围读取和公开值写入接口，区分原始值与显示值，并等待编辑提交及异步写入完成。`getSheet()`、`getluckysheetfile()`、`flowdata()` 和底层刷新方法暴露内部引用或状态，直接修改会绕开文本约束、历史和通知；它们继续保留给既有集成。
+
 Luckysheet针对常用的数据操作需求，开放了主要功能的API，开发者可以根据需要进行任意对接开发。
 
 使用注意：

@@ -1,3 +1,5 @@
+import { htmlCellText, clipboardDocument, clipboardFont, matchesCopyTable, clipboardInlineStrings } from "../utils/clipboard";
+import { cssFontSizeToPt } from "../utils/textCell";
 import mobileinit from "./mobile";
 import luckysheetConfigsetting from "./luckysheetConfigsetting";
 import luckysheetFreezen from "./freezen";
@@ -267,7 +269,7 @@ export default function luckysheetHandler() {
         });
 
     //页面resize
-    $(window).resize(function() {
+    $(window).off("resize.luckysheetEvent").on("resize.luckysheetEvent", function() {
         let luckysheetDocument = document.getElementById(Store.container);
         if (luckysheetDocument) {
             luckysheetsizeauto();
@@ -2778,6 +2780,7 @@ export default function luckysheetHandler() {
                         }
                     }
 
+                    luckysheetDropCell.preview(row_index,col_index,event.clientX,event.clientY);
                     $("#luckysheet-cell-selected-extend").css({
                         left: left,
                         width: width,
@@ -4686,6 +4689,7 @@ export default function luckysheetHandler() {
         //选区下拉
         if (Store.luckysheet_cell_selected_extend) {
             Store.luckysheet_cell_selected_extend = false;
+            luckysheetDropCell.hidePreview();
             $("#luckysheet-cell-selected-extend").hide();
 
             if (!checkProtectionLockedRangeList(Store.luckysheet_select_save, Store.currentSheetIndex)) {
@@ -4885,6 +4889,7 @@ export default function luckysheetHandler() {
             last["row"] = [row_s, row_e];
             last["column"] = [col_s, col_e];
 
+            if (luckysheetConfigsetting.safeStrMode) { luckysheetDropCell.textFillBase=null; luckysheetDropCell.applyType="auto"; }
             luckysheetDropCell.update();
             luckysheetDropCell.createIcon();
 
@@ -5106,6 +5111,7 @@ export default function luckysheetHandler() {
 
             Store.luckysheet_select_save = [{ row: [r0, r1 + step], column: [c0, c1] }];
 
+            if (luckysheetConfigsetting.safeStrMode) { luckysheetDropCell.textFillBase=null; luckysheetDropCell.applyType="auto"; }
             luckysheetDropCell.update();
             luckysheetDropCell.createIcon();
 
@@ -5946,106 +5952,14 @@ export default function luckysheetHandler() {
                 clipboardData = e.originalEvent.clipboardData;
             }
 
-            let txtdata = clipboardData.getData("text/html") || clipboardData.getData("text/plain");
+            const htmlData = clipboardData.getData("text/html");
+            let txtdata = htmlData || clipboardData.getData("text/plain");
 
             //如果标示是qksheet复制的内容，判断剪贴板内容是否是当前页面复制的内容
-            let isEqual = true;
-            if (
-                txtdata.indexOf("luckysheet_copy_action_table") > -1 &&
-                Store.luckysheet_copy_save["copyRange"] != null &&
-                Store.luckysheet_copy_save["copyRange"].length > 0
-            ) {
-                //剪贴板内容解析
-                let cpDataArr = [];
-
-                let reg = new RegExp("<tr.*?>(.*?)</tr>", "gs");
-                let reg2 = new RegExp("<td.*?>(.*?)</td>", "gs");
-
-                let regArr = txtdata.match(reg) || [];
-
-                for (let i = 0; i < regArr.length; i++) {
-                    let cpRowArr = [];
-
-                    let reg2Arr = regArr[i].match(reg2);
-
-                    if (reg2Arr != null) {
-                        for (let j = 0; j < reg2Arr.length; j++) {
-                            let cpValue = reg2Arr[j].replace(/<td.*?>/gs, "").replace(/<\/td>/gs, "");
-                            cpRowArr.push(cpValue);
-                        }
-                    }
-
-                    cpDataArr.push(cpRowArr);
-                }
-
-                //当前页面复制区内容
-                let copy_r1 = Store.luckysheet_copy_save["copyRange"][0].row[0],
-                    copy_r2 = Store.luckysheet_copy_save["copyRange"][0].row[1],
-                    copy_c1 = Store.luckysheet_copy_save["copyRange"][0].column[0],
-                    copy_c2 = Store.luckysheet_copy_save["copyRange"][0].column[1];
-
-                let copy_index = Store.luckysheet_copy_save["dataSheetIndex"];
-
-                let d;
-                if (copy_index == Store.currentSheetIndex) {
-                    d = editor.deepCopyFlowData(Store.flowdata);
-                } else {
-                    d = Store.luckysheetfile[getSheetIndex(copy_index)].data;
-                }
-
-                for (let r = copy_r1; r <= copy_r2; r++) {
-                    if (r - copy_r1 > cpDataArr.length - 1) {
-                        break;
-                    }
-
-                    for (let c = copy_c1; c <= copy_c2; c++) {
-                        let cell = d[r][c];
-                        let isInlineStr = false;
-                        if (cell != null && cell.mc != null && cell.mc.rs == null) {
-                            continue;
-                        }
-
-                        let v;
-                        if (cell != null) {
-                            if (cell.ct != null && cell.ct.fa.indexOf("w") > -1) {
-                                v = d[r][c].v;
-                            } else {
-                                v = d[r][c].m;
-                            }
-                        } else {
-                            v = "";
-                        }
-
-                        if (v == null && d[r][c] && d[r][c].ct && d[r][c].ct.t == "inlineStr") {
-                            v = d[r][c].ct.s.map((val) => val.v).join("");
-                            isInlineStr = true;
-                        }
-                        if (v == null) {
-                            v = "";
-                        }
-                        if (isInlineStr) {
-                            const cpData = $(cpDataArr[r - copy_r1][c - copy_c1])
-                                .text()
-                                .replace(/\s|\n/g, " ");
-                            const storeValue = v.replace(/\n/g, "").replace(/\s/g, " ");
-                            if (cpData != storeValue) {
-                                isEqual = false;
-                                break;
-                            }
-                        } else {
-                            const copyCellValue = cpDataArr[r - copy_r1][c - copy_c1];
-                            const normalizedCopyCellValue =
-                                copyCellValue == null ? "" : String(copyCellValue).trim();
-                            const normalizedStoreValue = typeof v === "string" ? v.trim() : String(v).trim();
-
-                            if (normalizedCopyCellValue !== normalizedStoreValue) {
-                                isEqual = false;
-                                break;
-                            }
-                        }
-                    }
-                }
-            }
+//剪贴板内容解析
+//当前页面复制区内容
+            const copyFile=Store.luckysheetfile[getSheetIndex(Store.luckysheet_copy_save.dataSheetIndex)];
+            const isEqual=!!copyFile && matchesCopyTable(htmlData,Store.luckysheet_copy_save,copyFile.data,copyFile.config||{});
 
             const locale_fontjson = locale().fontjson;
 
@@ -6055,7 +5969,7 @@ export default function luckysheetHandler() {
             }
 
             if (
-                txtdata.indexOf("luckysheet_copy_action_table") > -1 &&
+                (htmlData || window.clipboardData) && txtdata.indexOf("luckysheet_copy_action_table") > -1 &&
                 Store.luckysheet_copy_save["copyRange"] != null &&
                 Store.luckysheet_copy_save["copyRange"].length > 0 &&
                 isEqual
@@ -6071,13 +5985,14 @@ export default function luckysheetHandler() {
             } else if (txtdata.indexOf("luckysheet_copy_action_image") > -1) {
                 imageCtrl.pasteImgItem();
             } else {
-                if (txtdata.indexOf("table") > -1) {
-                    $("#luckysheet-copy-content").html(txtdata);
+                if (htmlData && /<table[\s>]/i.test(htmlData)) {
+                    const clipboard = clipboardDocument(htmlData);
+                    const clipboardRoot = clipboard.document.body;
 
-                    let data = new Array($("#luckysheet-copy-content").find("table tr").length);
+                    let data = new Array($(clipboardRoot).find("table tr").length);
                     let colLen = 0;
                     const cellElements = "th, td";
-                    $("#luckysheet-copy-content")
+                    $(clipboardRoot)
                         .find("table tr")
                         .eq(0)
                         .find(cellElements)
@@ -6095,7 +6010,7 @@ export default function luckysheetHandler() {
 
                     let r = 0;
                     let borderInfo = {};
-                    $("#luckysheet-copy-content")
+                    $(clipboardRoot)
                         .find("table tr")
                         .each(function() {
                             let $tr = $(this);
@@ -6103,8 +6018,10 @@ export default function luckysheetHandler() {
                             $tr.find(cellElements).each(function() {
                                 let $td = $(this);
                                 let cell = {};
-                                let txt = $td.text();
-                                if ($.trim(txt).length == 0) {
+                                let txt = htmlCellText($td[0]);
+                                if (luckysheetConfigsetting.safeStrMode) {
+                                    cell.v = txt; cell.m = txt; cell.ct = { fa: "@", t: "s" };
+                                } else if ($.trim(txt).length == 0) {
                                     cell.v = null;
                                     cell.m = "";
                                 } else {
@@ -6114,6 +6031,7 @@ export default function luckysheetHandler() {
                                     cell.m = mask[0];
                                 }
 
+                                if(luckysheetConfigsetting.safeStrMode){const parts=clipboardInlineStrings($td[0]);if(parts)cell.ct={fa:"@",t:"inlineStr",s:parts};}
                                 let bg = $td.css("background-color");
                                 if (bg == "rgba(0, 0, 0, 0)") {
                                     bg = null;
@@ -6141,23 +6059,23 @@ export default function luckysheetHandler() {
                                     cell.it = 1;
                                 }
 
-                                let inlineFontFamily = $td[0].style.fontFamily;
+                                let inlineFontFamily = clipboardFont($td[0],"fontFamily");
                                 if (inlineFontFamily) {
                                     let ffs = inlineFontFamily.split(",");
                                     for (let i = 0; i < ffs.length; i++) {
-                                        let fa = $.trim(ffs[i].toLowerCase());
+                                        let fa = $.trim(ffs[i].toLowerCase()).replace(/["']/g, "");
                                         fa = locale_fontjson[fa];
                                         if (fa == null) {
-                                            cell.ff = 0;
+                                            cell.ff = $.trim(ffs[i]).replace(/["']/g, "");
                                         } else {
-                                            cell.ff = fa;
+                                            cell.ff = locale().fontarray[fa];
                                             break;
                                         }
                                     }
                                 }
-                                let inlineFontSize = $td[0].style.fontSize;
+                                let inlineFontSize = clipboardFont($td[0],"fontSize");
                                 if (inlineFontSize) {
-                                    cell.fs = Math.round((parseInt(inlineFontSize) * 72) / 96);
+                                    cell.fs = cssFontSizeToPt(inlineFontSize, $td.css("font-size"));
                                 }
 
                                 let fc = $td.css("color");
@@ -6327,7 +6245,7 @@ export default function luckysheetHandler() {
 
                     Store.luckysheet_selection_range = [];
                     selection.pasteHandler(data, borderInfo);
-                    $("#luckysheet-copy-content").empty();
+                    clipboard.dispose();
                 }
 
                 //复制的是图片

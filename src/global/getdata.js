@@ -26,7 +26,7 @@ export function getdatabyselection(range, sheetIndex) {
         cfg = Store.luckysheetfile[getSheetIndex(sheetIndex)]["config"];
     }
     else{
-        d = editor.deepCopyFlowData(Store.flowdata);
+        d = Store.flowdata;
         cfg = Store.config;    
     }
 
@@ -44,7 +44,8 @@ export function getdatabyselection(range, sheetIndex) {
         let row = [];
 
         for (let c = range["column"][0]; c <= range["column"][1]; c++) {
-            row.push(d[r][c]);
+            const cell = d[r][c];
+            row.push(cell && typeof cell === "object" ? $.extend(true, {}, cell) : cell);
         }
 
         data.push(row);

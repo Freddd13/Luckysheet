@@ -14,7 +14,7 @@ function execScroll(){
 }
 
 //全局滚动事件
-export default function luckysheetscrollevent(isadjust) {
+function performScroll(isadjust) {
     let $t = $("#luckysheet-cell-main");
     let scrollLeft = $("#luckysheet-scrollbar-x").scrollLeft(), 
         scrollTop = $("#luckysheet-scrollbar-y").scrollTop(),
@@ -110,4 +110,17 @@ export default function luckysheetscrollevent(isadjust) {
 
     if(!method.createHookFunction("scroll", {scrollLeft, scrollTop, canvasHeight})){ return; }
 
+}
+
+let pendingScroll = null;
+export function cancelPendingScroll() {
+    if (pendingScroll != null) cancelAnimationFrame(pendingScroll);
+    pendingScroll = null;
+}
+export default function luckysheetscrollevent(isadjust) {
+    if (pendingScroll != null) return;
+    pendingScroll = requestAnimationFrame(() => {
+        pendingScroll = null;
+        if (document.getElementById("luckysheet-cell-main")) performScroll(isadjust);
+    });
 }

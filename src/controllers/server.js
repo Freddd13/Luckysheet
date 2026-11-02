@@ -1,3 +1,4 @@
+import viewDecorations from "./viewDecorations";
 import pako from 'pako'
 import { showloading, hideloading } from '../global/loading';
 import { luckysheetrefreshgrid, jfrefreshgrid_rhcw } from '../global/refresh';
@@ -220,6 +221,7 @@ const server = {
                 if (sheetToUpdate !== null) {
                   setTimeout(() => {
                     const index = data.data.i;
+                    viewDecorations.rekey(oldIndex,index);
                     sheetToUpdate.index = index;
                     Store.currentSheetIndex = index;
 
@@ -381,6 +383,8 @@ const server = {
 	    }
     },
     wsUpdateMsg: function(item) {
+try {
+
 	    let type = item.t,
 	        index = item.i,
 	        value = item.v;
@@ -974,7 +978,9 @@ const server = {
 	    else if(type == "na"){ //表格名称
 	        $("#luckysheet_info_detail_input").val(value).css("width", getByteLen(value) * 10);
 	    }
-	},
+
+} finally { if(Store.luckysheetfile && Store.luckysheetfile.some(file=>file.index==item.i)) viewDecorations.changed(item.i,null,"cooperative"); }
+},
     multipleIndex: 0,
     multipleRangeShow: function(id, name, r, c, value) {
     	let _this = this;

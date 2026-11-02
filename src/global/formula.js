@@ -1,3 +1,8 @@
+import { textCell } from "../utils/textCell";
+import luckysheetConfigsetting from "../controllers/luckysheetConfigsetting";
+import { deferForInstance, getInstanceRevision } from "../utils/instance";
+import viewDecorations from "../controllers/viewDecorations";
+import { textModeMessage } from "../controllers/textInput";
 import { replaceHtml, getObjType, chatatABC, ABCatNum, luckysheetfontformat } from "../utils/util";
 import { getSheetIndex, getRangetxt, getluckysheetfile } from "../methods/get";
 import { setluckysheetfile } from "../methods/set";
@@ -13,7 +18,7 @@ import { isRealNum, isRealNull, valueIsError, isEditMode } from "./validate";
 import { isdatetime, isdatatype } from "./datecontroll";
 import { getCellTextSplitArr, getCellTextInfo } from "../global/getRowlen";
 import { getcellvalue, getcellFormula, getInlineStringNoStyle, getOrigincell } from "./getdata";
-import { setcellvalue } from "./setdata";
+import { setcellvalue, setFormulaResult } from "./setdata";
 import { genarate, valueShowEs } from "./format";
 import editor from "./editor";
 import tooltip from "./tooltip";
@@ -1329,6 +1334,27 @@ const luckysheetformula = {
                 _this.cancelNormalSelected();
                 return;
             }
+        }
+
+        if (luckysheetConfigsetting.safeStrMode) {
+            const instanceRevision=getInstanceRevision();
+            if (value && typeof value === "object" && value.f != null) { tooltip.info(textModeMessage, ""); return; }
+            const previous = Store.flowdata[r][c];
+            const incoming = value == null ? { v: inputText } : typeof value === "object" ? value : { v: value };
+            if (value == null && inputHtml.substr(0, 5) === "<span") incoming.ct = { fa: "@", t: "inlineStr", s: convertSpanToShareString($input.find("span")) };
+            else if (!incoming.ct) incoming.ct = { fa: "@", t: "s" };
+            if (!method.createHookFunction("cellUpdateBefore", r, c, value == null ? inputText : value, isRefresh)) return;
+            if(getInstanceRevision()!==instanceRevision)return;
+            const d = Store.flowdata.slice();
+            d[r] = d[r].slice();
+            d[r][c] = textCell({ ...(previous && typeof previous === "object" ? previous : {}), ...incoming });
+            const file=Store.luckysheetfile[getSheetIndex(Store.currentSheetIndex)];
+            const allParam=previous && previous.f!=null?{calc:(file.calcChain||[]).filter(cell=>cell.r!==r||cell.c!==c),dynamicArray:(file.dynamicArray||[]).filter(cell=>cell.r!==r||cell.c!==c)}:{};
+            if (isRefresh) jfrefreshgrid(d, [{ row: [r, r], column: [c, c] }],allParam);
+            const updated = d[r][c];
+            if(getInstanceRevision()===instanceRevision)deferForInstance(() => method.createHookFunction("cellUpdated", r, c, previous, updated, isRefresh), 0);
+            if (!isRefresh) return { data: d, allParam };
+            return;
         }
 
         let curv = Store.flowdata[r][c];
@@ -5893,6 +5919,7 @@ const luckysheetformula = {
         let _this = this;
         let luckysheetfile = getluckysheetfile();
         if (_this.groupValuesRefreshData.length > 0) {
+            const changes = [], copiedRows = new Map();
             for (let i = 0; i < _this.groupValuesRefreshData.length; i++) {
                 let item = _this.groupValuesRefreshData[i];
 
@@ -5901,9 +5928,25 @@ const luckysheetformula = {
                 // }
 
                 let file = luckysheetfile[getSheetIndex(item.index)];
-                let data = file.data;
+                let data = file && file.data;
                 if (data == null) {
                     continue;
+                }
+
+                if (luckysheetConfigsetting.safeStrMode) {
+                    const previous = data[item.r] && data[item.r][item.c];
+                    if (!previous || !previous.f) continue;
+                    const sameValue = previous.v === item.v || (previous.v != null && item.v != null && String(previous.v) === String(item.v));
+                    if (sameValue && previous.f === item.f && !item.spe) continue;
+                    if (!copiedRows.has(file)) {
+                        copiedRows.set(file, new Set());
+                        if (file.index != Store.currentSheetIndex) file.data = data = data.slice();
+                    }
+                    const rows = copiedRows.get(file);
+                    if (!rows.has(item.r)) {
+                        data[item.r] = data[item.r].slice();
+                        rows.add(item.r);
+                    }
                 }
 
                 let updateValue = {};
@@ -5916,7 +5959,8 @@ const luckysheetformula = {
                 }
                 updateValue.v = item.v;
                 updateValue.f = item.f;
-                const cell = setcellvalue(item.r, item.c, data, updateValue);
+                const cell = luckysheetConfigsetting.safeStrMode ? setFormulaResult(item.r, item.c, data, updateValue) : setcellvalue(item.r, item.c, data, updateValue);
+                changes.push({index:item.index,r:item.r,c:item.c});
                 server.saveParam("v", item.index, cell, {
                     r: item.r,
                     c: item.c,
@@ -5925,6 +5969,7 @@ const luckysheetformula = {
 
             editor.webWorkerFlowDataCache(Store.flowdata); //worker存数据
             _this.groupValuesRefreshData = [];
+            viewDecorations.noteFormulaChanges(changes);
         }
     },
     delFunctionGroup: function(r, c, index) {

@@ -1,3 +1,7 @@
+import { writeTextRange } from "./textInput";
+import escapeHtml from "escape-html";
+import { textCell, cellText } from "../utils/textCell";
+import { parseClipboardText, formatClipboardText, expandMergedPaste } from "../utils/clipboard";
 import { selectHightlightShow, selectionCopyShow } from "./select";
 import menuButton from "./menuButton";
 import conditionformat from "./conditionformat";
@@ -18,6 +22,7 @@ import locale from "../locale/locale";
 import imageCtrl from "./imageCtrl";
 import luckysheetConfigsetting from "./luckysheetConfigsetting";
 
+let copySequence=0;
 const selection = {
     clearcopy: function(e) {
         let clipboardData = window.clipboardData; //for IE
@@ -157,6 +162,7 @@ const selection = {
             copyRange: copyRange,
             RowlChange: RowlChange,
             HasMC: HasMC,
+            copyId: Date.now().toString(36)+"-"+(++copySequence)+"-"+Math.random().toString(36).slice(2),
         };
 
         //copy范围数据拼接成table 赋给剪贴板
@@ -459,7 +465,7 @@ const selection = {
                         c_value = d[r][c].ct.s
                             .map((val) => {
                                 const brDom = $('<br style="mso-data-placement:same-cell;">');
-                                const splitValue = val.v.split("\r\n");
+                                const splitValue = val.v.split(/\r\n|\r|\n/);
                                 return splitValue
                                     .map((item) => {
                                         if (!item) {
@@ -473,7 +479,7 @@ const selection = {
                                         val.fc && font.css("color", val.fc); //  字体颜色
                                         if (val.cl) {
                                             // 判断删除线
-                                            font.append(`<s>${item}</s>`);
+                                            font.append($("<s></s>").text(item));
                                         } else {
                                             font.text(item);
                                         }
@@ -488,6 +494,7 @@ const selection = {
                         c_value = "";
                     }
 
+                    if (!(d[r][c] && d[r][c].ct && d[r][c].ct.t === "inlineStr")) c_value = escapeHtml(c_value == null ? "" : String(c_value)).replace(/\r\n|\r|\n/g, '<br style="mso-data-placement:same-cell;">');
                     // c_value = formula.ltGtSignDeal(c_value)
 
                     column += c_value;
@@ -538,7 +545,7 @@ const selection = {
             cpdata += "</tr>";
         }
         cpdata =
-            '<table data-type="luckysheet_copy_action_table">' +
+            `<table data-type="luckysheet_copy_action_table" data-copy-id="${Store.luckysheet_copy_save.copyId}">` +
             `<colgroup>${colgroup}</colgroup>` +
             cpdata +
             "</table>";
@@ -567,7 +574,12 @@ const selection = {
             // oInput.style.display='none';
             // document.body.removeChild(oInput);
         } else {
-            clipboardData.setData("Text", cpdata);
+            if (window.clipboardData) clipboardData.setData("Text", formatClipboardText(rowIndexArr.map(r => colIndexArr.map(c => cellText(Store.flowdata[r][c])))));
+            else {
+                clipboardData.setData("text/html", cpdata);
+                clipboardData.setData("text/plain", formatClipboardText(rowIndexArr.map(r => colIndexArr.map(c => cellText(Store.flowdata[r][c])))));
+            }
+
             return false; //否则设不生效
         }
     },
@@ -648,7 +660,7 @@ const selection = {
             }
         }, 10);
     },
-    pasteHandler: function(data, borderInfo) {
+    pasteHandler: function(data, borderInfo = {}) {
         // console.log("paste by  paste");
 
         if (!checkProtectionLockedRangeList(Store.luckysheet_select_save, Store.currentSheetIndex)) {
@@ -670,6 +682,32 @@ const selection = {
                     `<i class="fa fa-exclamation-triangle"></i>${locale_paste.warning}`,
                     locale_paste.errorNotAllowMulti,
                 );
+            }
+        }
+
+        if (Store.luckysheet_select_save.length > 1) return;
+        if (luckysheetConfigsetting.safeStrMode && Array.isArray(data)) {
+            if (data.some(row => row.some(cell => cell && cell.mc))) {
+                if (!window.confirm("来源包含合并单元格。确定后展开为普通单元格，仅保留左上角内容；取消则不粘贴。")) return;
+                data = expandMergedPaste(data);
+            }
+
+        }
+
+        if(luckysheetConfigsetting.safeStrMode) {
+            const rows=typeof data === "string" ? parseClipboardText(data) : data;
+            if(!rows.length)return;
+            const selected=Store.luckysheet_select_save[Store.luckysheet_select_save.length-1];
+            const target={row:[selected.row[0],selected.row[0]+rows.length-1],column:[selected.column[0],selected.column[0]+rows[0].length-1]};
+            const overlaps=Object.values(Store.config.merge||{}).some(mc=>mc.r<=target.row[1]&&mc.r+mc.rs-1>=target.row[0]&&mc.c<=target.column[1]&&mc.c+mc.cs-1>=target.column[0]);
+            if(!overlaps) {
+                const cfg=$.extend(true,{},Store.config);
+                const borders=Object.entries(borderInfo).map(([key,value])=>{const [r,c]=key.split("_").map(Number);return {rangeType:"cell",value:{row_index:r+target.row[0],col_index:c+target.column[0],...value}};});
+                if(borders.length)cfg.borderInfo=(cfg.borderInfo||[]).concat(borders);
+                const file=Store.luckysheetfile[getSheetIndex(Store.currentSheetIndex)];
+                const result=writeTextRange(rows,target,file,{allParam:borders.length?{cfg}:undefined,operation:"paste"});
+                const update=done=>{if(done&&Store.luckysheet_select_save.includes(selected)){selected.row=target.row;selected.column=target.column;selectHightlightShow();}return done;};
+                return result&&typeof result.then==="function"?result.then(update):update(result);
             }
         }
 
@@ -779,7 +817,7 @@ const selection = {
                 value = data[h - minh][c - minc];
               }
 
-              x[c] = $.extend(true, {}, value);
+              x[c] = luckysheetConfigsetting.safeStrMode ? textCell(value) : $.extend(true, {}, value);
 
               if (value != null && "mc" in x[c]) {
                 if (x[c]["mc"].rs != null) {
@@ -852,18 +890,8 @@ const selection = {
           }
         } else {
             // console.log("2");
-            data = data.replace(/\r/g, "");
-            let dataChe = [];
-            let che = data.split("\n"),
-                colchelen = che[0].split("\t").length;
-
-            for (let i = 0; i < che.length; i++) {
-                if (che[i].split("\t").length < colchelen) {
-                    continue;
-                }
-
-                dataChe.push(che[i].split("\t"));
-            }
+            let dataChe = parseClipboardText(data);
+            if (!dataChe.length) return;
 
             let d = editor.deepCopyFlowData(Store.flowdata); //取数据
 
@@ -948,6 +976,7 @@ const selection = {
                         x[c + curC] = cell;
                     }
 
+                    if (luckysheetConfigsetting.safeStrMode) x[c + curC] = textCell({ ...(originCell && typeof originCell === "object" ? originCell : {}), v: dataChe[r][c], ct: { fa: "@", t: "s" } });
                     // safe ct
                     if (luckysheetConfigsetting.safeStrMode) {
                         if (originCell instanceof Object) {
@@ -1013,6 +1042,11 @@ const selection = {
             [],
             getdatabyselection({ row: [c_r1, c_r2], column: [c_c1, c_c2] }, copySheetIndex),
         );
+        if (luckysheetConfigsetting.safeStrMode && copyData.some(row=>row.some(cell=>cell&&cell.mc))) {
+            if(!window.confirm("来源包含合并单元格。确定后展开为普通单元格，仅保留左上角内容；取消则不粘贴。"))return;
+            copyData=expandMergedPaste(copyData);copyHasMC=false;
+        }
+
 
         if (Store.currentSheetIndex == copySheetIndex) {
             copyData.forEach(row => {
@@ -1070,7 +1104,7 @@ const selection = {
             return;
         }
 
-        let d = editor.deepCopyFlowData(Store.flowdata); //取数据
+        let d = editor.deepCopyFlowData(Store.flowdata,luckysheetConfigsetting.safeStrMode?pasteRows(copyRange):undefined); //取数据
         let rowMaxLength = d.length;
         let cellMaxLength = d[0].length;
 
@@ -1221,7 +1255,7 @@ const selection = {
                     value = copyData[h - minh][c - minc];
                 }
 
-                x[c] = $.extend(true, {}, value);
+                x[c] = luckysheetConfigsetting.safeStrMode ? textCell(value) : $.extend(true, {}, value);
 
                 if (value != null && copyHasMC && "mc" in x[c]) {
                     if (x[c]["mc"].rs != null) {
@@ -1560,6 +1594,11 @@ const selection = {
         }
 
         let copyData = $.extend(true, [], arr);
+        if (luckysheetConfigsetting.safeStrMode && copyData.some(row=>row.some(cell=>cell&&cell.mc))) {
+            if(!window.confirm("来源包含合并单元格。确定后展开为普通单元格，仅保留左上角内容；取消则不粘贴。"))return;
+            copyData=expandMergedPaste(copyData);copyHasMC=false;
+        }
+
         
         if (Store.currentSheetIndex == copySheetIndex) {
             copyData.forEach(row => {
@@ -1638,7 +1677,7 @@ const selection = {
         let timesH = (maxh - minh + 1) / copyh;
         let timesC = (maxc - minc + 1) / copyc;
 
-        let d = editor.deepCopyFlowData(Store.flowdata); //取数据
+        let d = editor.deepCopyFlowData(Store.flowdata,luckysheetConfigsetting.safeStrMode?pasteRows(copyRange):undefined); //取数据
         let rowMaxLength = d.length;
         let cellMaxLength = d[0].length;
 
@@ -1740,7 +1779,7 @@ const selection = {
                             value = $.extend(true, {}, copyData[h - mth][c - mtc]);
                         }
 
-                        if (value != null && value.f != null) {
+                        if (!luckysheetConfigsetting.safeStrMode && value != null && value.f != null) {
                             let func = value.f;
 
                             if (offsetRow > 0) {
@@ -1775,7 +1814,7 @@ const selection = {
                             }
                         }
 
-                        x[c] = $.extend(true, {}, value);
+                        x[c] = luckysheetConfigsetting.safeStrMode ? textCell(value) : $.extend(true, {}, value);
 
                         if (value != null && copyHasMC && "mc" in x[c]) {
                             if (x[c]["mc"].rs != null) {
@@ -1899,6 +1938,11 @@ const selection = {
             [],
             getdatabyselection({ row: [c_r1, c_r2], column: [c_c1, c_c2] }, copySheetIndex),
         );
+        if (luckysheetConfigsetting.safeStrMode && copyData.some(row=>row.some(cell=>cell&&cell.mc))) {
+            if(!window.confirm("来源包含合并单元格。确定后展开为普通单元格，仅保留左上角内容；取消则不粘贴。"))return;
+            copyData=expandMergedPaste(copyData);copyHasMC=false;
+        }
+
 
         //应用范围
         let last = Store.luckysheet_select_save[Store.luckysheet_select_save.length - 1];
@@ -2244,3 +2288,9 @@ const selection = {
 };
 
 export default selection;
+
+function pasteRows(copy) {
+    const ranges=copy.copyRange, selected=Store.luckysheet_select_save[Store.luckysheet_select_save.length-1];
+    const height=ranges.reduce((sum,range)=>sum+range.row[1]-range.row[0]+1,0);
+    return [{row:[selected.row[0],Math.max(selected.row[1],selected.row[0]+height-1)]},...ranges];
+}

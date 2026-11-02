@@ -1,3 +1,4 @@
+import Big from "big.js";
 import { getObjType } from '../utils/util';
 import { isRealNull, isRealNum, isEditMode } from './validate';
 import { isdatetime, diff } from './datecontroll';
@@ -27,6 +28,7 @@ function orderbydata(data, index, isAsc) {
             y1 = y[index].v;
         }
 
+        if(isRealNull(x1) && isRealNull(y1)) return 0;
         if(isRealNull(x1)){
             return 1;
         }
@@ -39,7 +41,7 @@ function orderbydata(data, index, isAsc) {
             return diff(x1, y1);
         }
         else if (isRealNum(x1) && isRealNum(y1)) {
-            return numeral(x1).value() - numeral(y1).value();
+            return numericCompare(x1,y1);
         }
         else if (!isRealNum(x1) && !isRealNum(y1)) {
             return x1.localeCompare(y1, "zh");
@@ -63,6 +65,7 @@ function orderbydata(data, index, isAsc) {
             y1 = y[index].v;
         }
 
+        if(isRealNull(x1) && isRealNull(y1)) return 0;
         if(isRealNull(x1)){
             return 1;
         }
@@ -75,7 +78,7 @@ function orderbydata(data, index, isAsc) {
             return diff(y1, x1);
         }
         else if (isRealNum(x1) && isRealNum(y1)) {
-            return numeral(y1).value() - numeral(x1).value();
+            return numericCompare(y1,x1);
         }
         else if (!isRealNum(x1) && !isRealNum(y1)) {
             return y1.localeCompare(x1, "zh");
@@ -124,7 +127,7 @@ function orderbydata1D(data, isAsc) {
             return diff(x1, y1);
         }
         else if (isRealNum(x1) && isRealNum(y1)) {
-            return numeral(x1).value() - numeral(y1).value();
+            return numericCompare(x1,y1);
         }
         else if (!isRealNum(x1) && !isRealNum(y1)) {
             return x1.localeCompare(y1, "zh");
@@ -160,7 +163,7 @@ function orderbydata1D(data, isAsc) {
             return diff(y1, x1);
         }
         else if (isRealNum(x1) && isRealNum(y1)) {
-            return numeral(y1).value() - numeral(x1).value();
+            return numericCompare(y1,x1);
         }
         else if (!isRealNum(x1) && !isRealNum(y1)) {
             return y1.localeCompare(x1, "zh");
@@ -288,6 +291,7 @@ function sortSelection(isAsc) {
         }
     }
 
+    allParam.operation="sort";
     jfrefreshgrid(d, [{ "row": [str, edr], "column": [c1, c2] }], allParam);
 }
 
@@ -391,3 +395,4 @@ export {
     sortSelection,
     sortColumnSeletion,
 }
+function numericCompare(a,b){const x=String(a).trim(),y=String(b).trim();if(/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(x)&&/^[+-]?(?:\d+\.?\d*|\.\d+)(?:e[+-]?\d+)?$/i.test(y))return new Big(x).cmp(y);return numeral(a).value()-numeral(b).value();}

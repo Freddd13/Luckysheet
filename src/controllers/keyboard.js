@@ -270,7 +270,7 @@ export function keyboardInitial(){
     //单元格编辑输入
     $("#luckysheet-input-box").click(function () {
         formula.rangeHightlightselected($("#luckysheet-rich-text-editor"));
-    }).add("#" + Store.container).on("keydown", function (event) {
+    }).add("#" + Store.container).on("keydown.luckysheetEvent", function (event) {
         let ctrlKey = event.ctrlKey;
         let altKey = event.altKey;
         let shiftKey = event.shiftKey;

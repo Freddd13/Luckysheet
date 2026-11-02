@@ -1,3 +1,4 @@
+import viewDecorations from "../controllers/viewDecorations";
 import pivotTable from "../controllers/pivotTable";
 import conditionformat from "../controllers/conditionformat";
 import alternateformat from "../controllers/alternateformat";
@@ -165,6 +166,7 @@ function luckysheetDrawgridRowTitle(scrollHeight, drawHeight, offsetTop) {
             luckysheetTableContent.stroke();
         }
 
+        viewDecorations.marker(luckysheetTableContent,"row",r,start_r+offsetTop,end_r+offsetTop,Store.rowHeaderWidth);
         preEndR = end_r;
 
         //列标题单元格渲染前触发，return false 则不渲染该单元格
@@ -343,6 +345,7 @@ function luckysheetDrawgridColumnTitle(scrollWidth, drawWidth, offsetLeft) {
         luckysheetTableContent.stroke();
         luckysheetTableContent.closePath();
 
+        viewDecorations.marker(luckysheetTableContent,"column",c,start_c+offsetLeft,end_c+offsetLeft,Store.columnHeaderHeight);
         preEndC = end_c;
 
         method.createHookFunction(
@@ -1144,6 +1147,8 @@ function luckysheetDrawMain(
         }
     }
 
+    viewDecorations.boundaries(luckysheetTableContent, scrollWidth, scrollHeight, offsetLeft, offsetTop, dataset_row_st, dataset_row_ed, dataset_col_st, dataset_col_ed);
+
     //渲染表格时有尾列时，清除右边灰色区域，防止表格有值溢出
     if (dataset_col_ed == Store.visibledatacolumn.length - 1) {
         luckysheetTableContent.clearRect(
@@ -1258,6 +1263,7 @@ let nullCellRender = function(
         fillStyle = Store.flowdata[r][c].tc;
     }
 
+    fillStyle = viewDecorations.fill(r, c, fillStyle);
     if (fillStyle == null) {
         luckysheetTableContent.fillStyle = "#FFFFFF";
     } else {
@@ -1443,6 +1449,7 @@ let cellRender = function(
         fillStyle = checksCF["cellColor"];
     }
     // luckysheetTableContent.textBaseline = 'top';
+    fillStyle = viewDecorations.fill(r, c, fillStyle);
     if (fillStyle == null) {
         luckysheetTableContent.fillStyle = "#FFFFFF";
     } else {
@@ -1743,10 +1750,6 @@ let cellRender = function(
         let pos_y = start_r + offsetTop + 1;
 
         luckysheetTableContent.save();
-        luckysheetTableContent.beginPath();
-        luckysheetTableContent.rect(pos_x, pos_y, cellWidth, cellHeight);
-        luckysheetTableContent.clip();
-        luckysheetTableContent.scale(Store.zoomRatio, Store.zoomRatio);
 
         let textInfo = getCellTextInfo(cell, luckysheetTableContent, {
             cellWidth: cellWidth,
@@ -1756,6 +1759,13 @@ let cellRender = function(
             r: r,
             c: c,
         });
+        const word=textInfo && textInfo.values && textInfo.values[0];
+        const fits=word && textInfo.type==='plain' && textInfo.rotate===0 && textInfo.values.length===1 &&
+            !word.inline && !word.cancelLine && (!word.underLine || word.underLine.length===0) && cell.it!=1 && checksCF==null &&
+            word.left>=0 && word.left+word.width<=cellWidth && word.top-textInfo.asc>=0 && word.top+textInfo.desc<=cellHeight;
+        // 完全位于单元格内的普通文字可直接绘制，减少滚动时的 Canvas 裁剪开销。
+        if(!fits){luckysheetTableContent.beginPath();luckysheetTableContent.rect(pos_x,pos_y,cellWidth,cellHeight);luckysheetTableContent.clip();}
+        luckysheetTableContent.scale(Store.zoomRatio, Store.zoomRatio);
 
         //若单元格有条件格式图标集
         if (checksCF != null && checksCF["icons"] != null && textInfo.type == "plain") {

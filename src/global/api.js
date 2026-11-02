@@ -1,4 +1,21 @@
+export { setViewDecorations, getViewDecorations, clearViewDecorations } from "../controllers/viewDecorations";
+import { writeTextRange, writeTextPoints, textModeMessage } from "../controllers/textInput";
+import { cellText } from "../utils/textCell";
 import Store from "../store";
+import viewDecorations from "../controllers/viewDecorations";
+
+export function getWorkbookInfo() {
+    return {
+        activeSheetIndex: Store.currentSheetIndex,
+        sheets: (Store.luckysheetfile || []).map((file, order) => ({
+            sheetIndex: file.index, order, name: file.name,
+            revision:viewDecorations.getRevision(file.index),
+            rowCount: file.data && file.data.length || file.row || 0,
+            columnCount: file.data && file.data[0] && file.data[0].length || file.column || 0,
+            active: file.index == Store.currentSheetIndex,
+        })),
+    };
+}
 import { replaceHtml, getObjType, chatatABC, luckysheetactiveCell } from "../utils/util";
 import { getSheetIndex, getluckysheet_select_save, getluckysheetfile } from "../methods/get";
 import locale from "../locale/locale";
@@ -67,7 +84,7 @@ export function getCellValue(row, column, options = {}) {
     let return_v;
 
     if(getObjType(cellData) == "object"){
-        return_v = cellData[type];
+        return_v = type === 'm' && cellData.m == null ? cellText(cellData) : cellData[type];
 
         if (type == "f" && return_v != null) {
             return_v = formula.functionHTMLGenerate(return_v);
@@ -129,6 +146,10 @@ export function setCellValue(row, column, value, options = {}) {
 
     if(file == null){
         return tooltip.info("The order parameter is invalid.", "");
+    }
+
+    if (luckysheetConfigsetting.safeStrMode) {
+        return writeTextRange([[value]], { row: [row, row], column: [column, column] }, file, options, isRefresh);
     }
 
     /* cell更新前触发  */
@@ -364,6 +385,9 @@ export function deleteCell(move, row, column, options = {}) {
  * @param {Function} options.success 操作结束的回调函数, callback参数为改变后的cell对象
  */
 export function setCellFormat(row, column, attr, value, options = {}) {
+    if(luckysheetConfigsetting.safeStrMode && ['v','m','f'].includes(attr))return tooltip.info('请通过值写入接口修改单元格内容。','');
+    if (luckysheetConfigsetting.safeStrMode && (attr === "mc" || attr === "ct" && value !== "@" && !(value && value.fa==='@' && value.t==='s'))) return tooltip.info(textModeMessage, "");
+    if(luckysheetConfigsetting.safeStrMode && attr==='ct' && value==='@')value={fa:'@',t:'s'};
     if (!isRealNum(row) || !isRealNum(column)) {
         return tooltip.info('Arguments row or column cannot be null or undefined.', '')
     }
@@ -464,14 +488,17 @@ export function find(content, options = {}) {
 
     let result = [];
     for (let i = 0; i < targetSheetData.length; i++) {
-        const rowArr = targetSheetData[i];
+        const rowArr = targetSheetData[i] || [];
 
         for (let j = 0; j < rowArr.length; j++) {
-            const cell = rowArr[j];
+            const source = rowArr[j];
 
-            if (!cell) {
+            if (!source) {
                 continue;
             }
+            const cell = { ...source };
+            const value = type === 'm' && source.m == null ? cellText(source) : source[type];
+            const searchable = value == null ? '' : String(value);
 
             // 添加cell的row, column属性
             // replace方法中的setCellValue中需要使用该属性
@@ -480,11 +507,11 @@ export function find(content, options = {}) {
 
             if (isWholeWord) {
                 if (isCaseSensitive) {
-                    if (content.toString() == cell[type]) {
+                    if (content.toString() == searchable) {
                         result.push(cell)
                     }
                 } else {
-                    if (cell[type] && content.toString().toLowerCase() == cell[type].toLowerCase()) {
+                    if (content.toString().toLowerCase() == searchable.toLowerCase()) {
                         result.push(cell)
                     }
                 }
@@ -495,17 +522,17 @@ export function find(content, options = {}) {
                 } else {
                     reg = new RegExp(func_methods.getRegExpStr(content), 'ig')
                 }
-                if (reg.test(cell[type])) {
+                if (reg.test(searchable)) {
                     result.push(cell)
                 }
             } else if (isCaseSensitive) {
                 let reg = new RegExp(func_methods.getRegExpStr(content), 'g');
-                if (reg.test(cell[type])) {
+                if (reg.test(searchable)) {
                     result.push(cell);
                 }
             } else {
                 let reg = new RegExp(func_methods.getRegExpStr(content), 'ig');
-                if (reg.test(cell[type])) {
+                if (reg.test(searchable)) {
                     result.push(cell);
                 }
             }
@@ -537,6 +564,12 @@ export function replace(content, replaceContent, options = {}) {
 
     if(file == null){
         return tooltip.info("The order parameter is invalid.", "");
+    }
+    if(luckysheetConfigsetting.safeStrMode) {
+        if(!matchCells.length)return matchCells;
+        const result=writeTextPoints(matchCells.map(cell=>({row:cell.row,column:cell.column,value:replaceContent})),file,{...options,operation:"replace",success:()=>{if(options.success)options.success(matchCells);}});
+        const done=success=>success?matchCells:false;
+        return result&&typeof result.then==="function"?result.then(done):done(result);
     }
     let sheetData = $.extend(true, [], file.data);
 
@@ -630,51 +663,9 @@ export function enterEditMode(options = {}){
  * @param {Number | String} order 工作表索引
  */
 export function frozenFirstRow(order) {
-    // store frozen
-    luckysheetFreezen.saveFrozen("freezenRow", order);
-
-    // 冻结为当前sheet页
-    if (!order || order == getSheetIndex(Store.currentSheetIndex)) {
-        let freezenhorizontaldata, row_st, top;
-        if (luckysheetFreezen.freezenRealFirstRowColumn) {
-            let row_st = 0;
-            top = Store.visibledatarow[row_st] - 2 + Store.columnHeaderHeight;
-            freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top
-            ];
-        } else {
-            let scrollTop = $("#luckysheet-cell-main").scrollTop();
-            row_st = luckysheet_searcharray(Store.visibledatarow, scrollTop);
-            if(row_st == -1){
-                row_st = 0;
-            }
-
-            top = Store.visibledatarow[row_st] - 2 - scrollTop + Store.columnHeaderHeight;
-            freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                scrollTop,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top
-            ];
-        }
-
-        luckysheetFreezen.saveFreezen(freezenhorizontaldata, top, null, null);
-
-        if (luckysheetFreezen.freezenverticaldata != null) {
-            luckysheetFreezen.cancelFreezenVertical();
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-        }
-
-        luckysheetFreezen.createFreezenHorizontal(freezenhorizontaldata, top);
-        luckysheetFreezen.createAssistCanvas();
-        luckysheetrefreshgrid();
-    }
+// store frozen
+// 冻结为当前sheet页
+return luckysheetFreezen.setAxes({row:0}, order);
 }
 
 /**
@@ -683,52 +674,9 @@ export function frozenFirstRow(order) {
  * @param {Number | String} order 工作表索引
  */
 export function frozenFirstColumn(order) {
-    // store frozen
-    luckysheetFreezen.saveFrozen("freezenColumn", order);
-
-    // 冻结为当前sheet页
-    if (!order || order == getSheetIndex(Store.currentSheetIndex)) {
-        let freezenverticaldata, col_st, left;
-        if (luckysheetFreezen.freezenRealFirstRowColumn) {
-            col_st = 0;
-            left = Store.visibledatacolumn[col_st] - 2 + Store.rowHeaderWidth;
-            freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                0,
-                luckysheetFreezen.cutVolumn(Store.visibledatacolumn, col_st + 1),
-                left
-            ];
-        } else {
-            let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-
-            col_st = luckysheet_searcharray(Store.visibledatacolumn, scrollLeft);
-            if(col_st == -1){
-                col_st = 0;
-            }
-
-            left = Store.visibledatacolumn[col_st] - 2 - scrollLeft + Store.rowHeaderWidth;
-            freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                scrollLeft,
-                luckysheetFreezen.cutVolumn(Store.visibledatacolumn, col_st + 1),
-                left
-            ];
-        }
-
-        luckysheetFreezen.saveFreezen(null, null, freezenverticaldata, left);
-
-        if (luckysheetFreezen.freezenhorizontaldata != null) {
-            luckysheetFreezen.cancelFreezenHorizontal();
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-        }
-
-        luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
-        luckysheetFreezen.createAssistCanvas();
-        luckysheetrefreshgrid();
-    }
+// store frozen
+// 冻结为当前sheet页
+return luckysheetFreezen.setAxes({column:0}, order);
 }
 
 /**
@@ -737,60 +685,8 @@ export function frozenFirstColumn(order) {
  * @param {Number | String} order 工作表索引
  */
 export function frozenRowRange(range, order) {
-    const locale_frozen = locale().freezen;
-
-    if (!range || (!range.hasOwnProperty('row_focus') && !formula.iscelldata(range))) {
-        if(isEditMode()){
-            alert(locale_frozen.noSeletionError);
-        } else{
-            tooltip.info(locale_frozen.noSeletionError, "");
-        }
-        return
-    }
-
-    if (typeof range === 'string' && formula.iscelldata(range)) {
-        range = formula.getcellrange(range)
-        range = {
-            row_focus: range.row[0],
-            column_focus: range.column[0]
-        }
-    }
-    // store frozen
-    luckysheetFreezen.saveFrozen("freezenRowRange", order, range);
-
-    if (!order || order == getSheetIndex(Store.currentSheetIndex)) {
-        let scrollTop = $("#luckysheet-cell-main").scrollTop();
-        let row_st = luckysheet_searcharray(Store.visibledatarow, scrollTop);
-
-        let row_focus = range.row_focus;
-        if(row_focus > row_st){
-            row_st = row_focus;
-        }
-        if(row_st == -1){
-            row_st = 0;
-        }
-
-        let top = Store.visibledatarow[row_st] - 2 - scrollTop + Store.columnHeaderHeight;
-        let freezenhorizontaldata = [
-            Store.visibledatarow[row_st],
-            row_st + 1,
-            scrollTop,
-            luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-            top
-        ];
-        luckysheetFreezen.saveFreezen(freezenhorizontaldata, top, null, null);
-
-        if (luckysheetFreezen.freezenverticaldata != null) {
-            luckysheetFreezen.cancelFreezenVertical();
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-        }
-
-        luckysheetFreezen.createFreezenHorizontal(freezenhorizontaldata, top);
-        luckysheetFreezen.createAssistCanvas();
-        luckysheetrefreshgrid();
-    }
-
+// store frozen
+const focus = frozenFocus(range); if(!Number.isInteger(focus.row_focus))throw new RangeError("冻结行无效。"); return luckysheetFreezen.setAxes({row:focus.row_focus}, order);
 }
 
 /**
@@ -799,60 +695,8 @@ export function frozenRowRange(range, order) {
  * @param {Number | String} order 工作表索引
  */
 export function frozenColumnRange(range, order) {
-    const locale_frozen = locale().freezen;
-    let isStringRange = typeof range === 'string' && formula.iscelldata(range);
-
-    if (!range || (!range.hasOwnProperty('column_focus') && !isStringRange)) {
-        if(isEditMode()){
-            alert(locale_frozen.noSeletionError);
-        } else{
-            tooltip.info(locale_frozen.noSeletionError, "");
-        }
-        return
-    }
-
-    if (isStringRange) {
-        range = formula.getcellrange(range)
-        range = {
-            row_focus: range.row[0],
-            column_focus: range.column[0]
-        }
-    }
-    // store frozen
-    luckysheetFreezen.saveFrozen("freezenColumnRange", order, range);
-
-    if (!order || order == getSheetIndex(Store.currentSheetIndex)) {
-        let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-        let col_st = luckysheet_searcharray(Store.visibledatacolumn, scrollLeft);
-
-        let column_focus = range.column_focus;
-        if(column_focus > col_st){
-            col_st = column_focus;
-        }
-        if(col_st == -1){
-            col_st = 0;
-        }
-
-        let left = Store.visibledatacolumn[col_st] - 2 - scrollLeft + Store.rowHeaderWidth;
-        let freezenverticaldata = [
-            Store.visibledatacolumn[col_st],
-            col_st + 1,
-            scrollLeft,
-            luckysheetFreezen.cutVolumn(Store.visibledatacolumn, col_st + 1),
-            left
-        ];
-        luckysheetFreezen.saveFreezen(null, null, freezenverticaldata, left);
-
-        if (luckysheetFreezen.freezenhorizontaldata != null) {
-            luckysheetFreezen.cancelFreezenHorizontal();
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-        }
-
-        luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
-        luckysheetFreezen.createAssistCanvas();
-        luckysheetrefreshgrid();
-    }
+// store frozen
+const focus = frozenFocus(range); if(!Number.isInteger(focus.column_focus))throw new RangeError("冻结列无效。"); return luckysheetFreezen.setAxes({column:focus.column_focus}, order);
 }
 
 /**
@@ -860,19 +704,8 @@ export function frozenColumnRange(range, order) {
  * @param {Number | String} order
  */
 export function cancelFrozen(order) {
-    luckysheetFreezen.saveFrozen("freezenCancel", order);
-
-    // 取消当前sheet冻结时，刷新canvas
-    if (!order || order == getSheetIndex(Store.currentSheetIndex)) {
-        if (luckysheetFreezen.freezenverticaldata != null) {
-            luckysheetFreezen.cancelFreezenVertical();
-        }
-        if (luckysheetFreezen.freezenhorizontaldata != null) {
-            luckysheetFreezen.cancelFreezenHorizontal();
-        }
-        luckysheetFreezen.createAssistCanvas();
-        luckysheetrefreshgrid();
-    }
+// 取消当前sheet冻结时，刷新canvas
+return luckysheetFreezen.setAxes({row:null,column:null}, order && typeof order === "object" ? order.order : order);
 }
 
 /**
@@ -884,25 +717,9 @@ export function cancelFrozen(order) {
  * @param {Function} options.success 操作结束的回调函数
  */
 export function setHorizontalFrozen(isRange, options = {}) {
-    let curSheetOrder = getSheetIndex(Store.currentSheetIndex);
-    let {
-        range,
-        order = curSheetOrder,
-        success
-    } = { ...options };
-
-    // 若已存在冻结，取消之前的冻结效果
-    cancelFrozen(order);
-
-    if (!isRange) {
-        frozenFirstRow(order)
-    } else { // 选区行冻结
-        frozenRowRange(range, order);
-    }
-
-    if (success && typeof success === 'function') {
-        success()
-    }
+// 若已存在冻结，取消之前的冻结效果
+// 选区行冻结
+const result = isRange ? frozenRowRange(options.range, options.order) : frozenFirstRow(options.order); if (options.success) options.success(); return result;
 }
 
 /**
@@ -914,25 +731,8 @@ export function setHorizontalFrozen(isRange, options = {}) {
  * @param {Function} options.success 操作结束的回调函数
  */
 export function setVerticalFrozen(isRange, options = {}) {
-    let curSheetOrder = getSheetIndex(Store.currentSheetIndex);
-    let {
-        range,
-        order = curSheetOrder,
-        success
-    } = { ...options };
-
-    // 若已存在冻结，取消之前的冻结效果
-    cancelFrozen(order);
-
-    if (!isRange) {
-        frozenFirstColumn(order);
-    } else {
-        frozenColumnRange(range, order);
-    }
-
-    if (success && typeof success === 'function') {
-        success()
-    }
+// 若已存在冻结，取消之前的冻结效果
+const result = isRange ? frozenColumnRange(options.range, options.order) : frozenFirstColumn(options.order); if (options.success) options.success(); return result;
 }
 
 /**
@@ -944,139 +744,12 @@ export function setVerticalFrozen(isRange, options = {}) {
  * @param {Function} options.success 操作结束的回调函数
  */
 export function setBothFrozen(isRange, options = {}) {
-    let curSheetOrder = getSheetIndex(Store.currentSheetIndex);
-    let {
-        range,
-        order = curSheetOrder,
-        success
-    } = { ...options };
-
-    let isCurrentSheet = !order || order == getSheetIndex(Store.currentSheetIndex);
-    const locale_frozen = locale().freezen;
-
-    // 若已存在冻结，取消之前的冻结效果
-    cancelFrozen(order);
-
-    // 冻结首行列
-    if (!isRange) {
-        // store frozen
-        luckysheetFreezen.saveFrozen("freezenRC", order)
-
-        if (isCurrentSheet) {
-            let scrollTop = $("#luckysheet-cell-main").scrollTop();
-            let row_st = luckysheet_searcharray(Store.visibledatarow, scrollTop);
-            if(row_st == -1){
-                row_st = 0;
-            }
-            let top = Store.visibledatarow[row_st] - 2 - scrollTop + Store.columnHeaderHeight;
-            let freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                scrollTop,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top
-            ];
-            luckysheetFreezen.saveFreezen(freezenhorizontaldata, top, null, null);
-
-            luckysheetFreezen.createFreezenHorizontal(freezenhorizontaldata, top);
-
-            let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-            let col_st = luckysheet_searcharray(Store.visibledatacolumn, scrollLeft);
-            if(col_st == -1){
-                col_st = 0;
-            }
-            let left = Store.visibledatacolumn[col_st] - 2 - scrollLeft + Store.rowHeaderWidth;
-            let freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                scrollLeft,
-                luckysheetFreezen.cutVolumn(Store.visibledatacolumn, col_st + 1),
-                left
-            ];
-            luckysheetFreezen.saveFreezen(null, null, freezenverticaldata, left);
-
-            luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
-
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-        }
-    } else {   // 冻结行列到选区
-        // store frozen
-        luckysheetFreezen.saveFrozen("freezenRCRange", order, range)
-
-        let isStringRange = typeof range === 'string' && formula.iscelldata(range);
-        if (isCurrentSheet) {
-            if ((!range || !(range.hasOwnProperty('column_focus') && range.hasOwnProperty('row_focus'))) && !isStringRange) {
-                if(isEditMode()){
-                    alert(locale_frozen.noSeletionError);
-                } else{
-                    tooltip.info(locale_frozen.noSeletionError, "");
-                }
-                return
-            }
-
-            if (isStringRange) {
-                range = formula.getcellrange(range)
-                range = {
-                    row_focus: range.row[0],
-                    column_focus: range.column[0]
-                }
-            }
-
-            let scrollTop = $("#luckysheet-cell-main").scrollTop();
-            let row_st = luckysheet_searcharray(Store.visibledatarow, scrollTop);
-
-            let row_focus = range.row_focus;
-
-            if(row_focus > row_st){
-                row_st = row_focus;
-            }
-
-            if(row_st == -1){
-                row_st = 0;
-            }
-
-            let top = Store.visibledatarow[row_st] - 2 - scrollTop + Store.columnHeaderHeight;
-            let freezenhorizontaldata = [
-                Store.visibledatarow[row_st],
-                row_st + 1,
-                scrollTop,
-                luckysheetFreezen.cutVolumn(Store.visibledatarow, row_st + 1),
-                top
-            ];
-            luckysheetFreezen.saveFreezen(freezenhorizontaldata, top, null, null);
-
-            luckysheetFreezen.createFreezenHorizontal(freezenhorizontaldata, top);
-
-            let scrollLeft = $("#luckysheet-cell-main").scrollLeft();
-            let col_st = luckysheet_searcharray(Store.visibledatacolumn, scrollLeft);
-
-            let column_focus = range.column_focus;
-
-            if(column_focus > col_st){
-                col_st = column_focus;
-            }
-
-            if(col_st == -1){
-                col_st = 0;
-            }
-
-            let left = Store.visibledatacolumn[col_st] - 2 - scrollLeft + Store.rowHeaderWidth;
-            let freezenverticaldata = [
-                Store.visibledatacolumn[col_st],
-                col_st + 1,
-                scrollLeft,
-                luckysheetFreezen.cutVolumn(Store.visibledatacolumn, col_st + 1),
-                left
-            ];
-            luckysheetFreezen.saveFreezen(null, null, freezenverticaldata, left);
-
-            luckysheetFreezen.createFreezenVertical(freezenverticaldata, left);
-
-            luckysheetFreezen.createAssistCanvas();
-            luckysheetrefreshgrid();
-        }
-    }
+// 若已存在冻结，取消之前的冻结效果
+// 冻结首行列
+// store frozen
+// 冻结行列到选区
+// store frozen
+const focus = isRange ? frozenFocus(options.range) : {row_focus:0,column_focus:0}; const result=luckysheetFreezen.setAxes({row:focus.row_focus,column:focus.column_focus},options.order); if(options.success) options.success(); return result;
 }
 
 /**
@@ -2858,7 +2531,7 @@ export function setRangeValue(data, options = {}) {
     let rowCount = range.row[1] - range.row[0] + 1,
         columnCount = range.column[1] - range.column[0] + 1;
 
-    if (data.length !== rowCount || data[0].length !== columnCount) {
+    if (!Array.isArray(data) || data.length !== rowCount || data.some(row => !Array.isArray(row) || row.length !== columnCount)) {
         return tooltip.info('The data to be set does not match the selection.', '')
     }
 
@@ -2867,6 +2540,7 @@ export function setRangeValue(data, options = {}) {
     if(file == null){
         return tooltip.info("The order parameter is invalid.", "");
     }
+    if (luckysheetConfigsetting.safeStrMode) return writeTextRange(data, range, file, options);
     let sheetData = $.extend(true, [], file.data);
 
     for (let i = 0; i < rowCount; i++) {
@@ -2959,6 +2633,9 @@ export function setSingleRangeFormat(attr, value, options = {}) {
  * @param {Function} options.success 操作结束的回调函数
  */
  export function setRangeFormat(attr, value, options = {}) {
+    if(luckysheetConfigsetting.safeStrMode && ['v','m','f'].includes(attr))return tooltip.info('请通过值写入接口修改单元格内容。','');
+    if(luckysheetConfigsetting.safeStrMode && (attr==='mc'||attr==='ct' && value!=='@' && !(value&&value.fa==='@'&&value.t==='s')))return tooltip.info(textModeMessage,'');
+    if(luckysheetConfigsetting.safeStrMode && attr==='ct' && value==='@')value={fa:'@',t:'s'};
     let curSheetOrder = getSheetIndex(Store.currentSheetIndex);
     let curRange = JSON.parse(JSON.stringify(Store.luckysheet_select_save));
     let {
@@ -2996,6 +2673,12 @@ export function setSingleRangeFormat(attr, value, options = {}) {
     let file = Store.luckysheetfile[order];
 
     let result = []
+    if(luckysheetConfigsetting.safeStrMode && ['ff','fs','fc','bg','bl','it','cl','un','ht','vt','tb','tr','rt'].includes(attr)) {
+        if(!file)return tooltip.info('工作表 order 无效。','');
+        const points=[];
+        for(const area of range)for(let r=area.row[0];r<=area.row[1];r++)for(let c=area.column[0];c<=area.column[1];c++)points.push({row:r,column:c,value:{[attr]:value}});
+        return writeTextPoints(points,file,{...options,ranges:range,formatOnly:true,operation:'format'});
+    }
 
     for (let i = 0; i < range.length; i++) {
         result.push(setSingleRangeFormat(attr, value, { range: range[i], order: order }));
@@ -3102,6 +2785,7 @@ export function setRangeFilter(type, options = {}) {
  * @param {Object} options.success 操作结束的回调函数
  */
 export function setRangeMerge(type, options = {}) {
+    if (luckysheetConfigsetting.safeStrMode) return tooltip.info(textModeMessage, "");
     let typeValues = ['all', 'horizontal', 'vertical'];
     if (typeValues.indexOf(type) < 0) {
         return tooltip.info('The type parameter must be included in [\'all\', \'horizontal\', \'vertical\']', '')
@@ -3531,6 +3215,7 @@ export function setRangeSort(type, options = {}) {
     }
 
     if (file.index == Store.currentSheetIndex) {
+        allParam.operation="sort";
         jfrefreshgrid(fileData, [{ "row": [r1, r2], "column": [c1, c2] }], allParam);
     }
     else{
@@ -3636,6 +3321,7 @@ export function setRangeSortMulti(hasTitle, sort, options = {}) {
     }
 
     if (file.index === Store.currentSheetIndex) {
+        allParam.operation="sort";
         jfrefreshgrid(fileData, [{ "row": [str, r2], "column": [c1, c2] }], allParam);
     }
     else{
@@ -6041,6 +5727,7 @@ export function getConfig(options = {}) {
  * @param {Function} options.success 操作结束的回调函数
  */
 export function setConfig(cfg, options = {}) {
+    if (luckysheetConfigsetting.safeStrMode && cfg.merge && Object.keys(cfg.merge).length) return tooltip.info(textModeMessage, "");
     if(getObjType(cfg) != 'object'){
         return tooltip.info("The cfg parameter is invalid.", "");
     }
@@ -6718,7 +6405,7 @@ export function transToData(celldata, options = {}){
  */
 export function toJson(){
 
-    const toJsonOptions = Store.toJsonOptions;
+    const toJsonOptions = $.extend(true, {}, Store.toJsonOptions);
 
     // Workbook name
     toJsonOptions.title = $("#luckysheet_info_detail_input").val();
@@ -6949,3 +6636,11 @@ export function openSearchDialog(source = 1){
     luckysheetSearchReplace.init();
     $("#luckysheet-search-replace #searchInput input").focus();
 }
+
+function frozenFocus(range) {
+ if (typeof range === "string") { if (!formula.iscelldata(range)) throw new RangeError("冻结选区无效。"); range=formula.getcellrange(range); }
+ range=range || Store.luckysheet_select_save[Store.luckysheet_select_save.length-1];
+ return {row_focus:range.row_focus == null ? range.row && range.row[0] : range.row_focus,column_focus:range.column_focus == null ? range.column && range.column[0] : range.column_focus};
+}
+export function cancelHorizontalFrozen(options={}) { return luckysheetFreezen.setAxes({row:null},options.order); }
+export function cancelVerticalFrozen(options={}) { return luckysheetFreezen.setAxes({column:null},options.order); }

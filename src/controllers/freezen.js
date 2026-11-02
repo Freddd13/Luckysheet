@@ -13,6 +13,44 @@ import { luckysheetrefreshgrid } from '../global/refresh';
 
 
 const luckysheetFreezen = {
+    getAxes(file) {
+        const frozen = file.frozen || {};
+        const range = frozen.range || {};
+        return {
+            row: frozen.type === "row" || frozen.type === "both" ? 0 : frozen.type === "rangeRow" || frozen.type === "rangeBoth" ? range.row_focus : null,
+            column: frozen.type === "column" || frozen.type === "both" ? 0 : frozen.type === "rangeColumn" || frozen.type === "rangeBoth" ? range.column_focus : null,
+        };
+    },
+    syncFrozen() {
+        const file=Store.luckysheetfile[getSheetIndex(Store.currentSheetIndex)];
+        const row=this.freezenhorizontaldata ? this.freezenhorizontaldata[1]-1 : null;
+        const column=this.freezenverticaldata ? this.freezenverticaldata[1]-1 : null;
+        file.frozen=row!=null&&column!=null?{type:"rangeBoth",range:{row_focus:row,column_focus:column}}:
+            row!=null?{type:"rangeRow",range:{row_focus:row}}:column!=null?{type:"rangeColumn",range:{column_focus:column}}:{type:"cancel"};
+    },
+    setAxes(axes, order) {
+        if (order == null) order = getSheetIndex(Store.currentSheetIndex);
+        const file = Store.luckysheetfile[order];
+        if (!file) throw new RangeError("工作表 order 无效。");
+        const next = { ...this.getAxes(file), ...axes };
+        for (const axis of ["row", "column"]) {
+            const limit = axis === "row" ? (file.data && file.data.length || file.row || Store.defaultrowNum) : (file.data && file.data[0] && file.data[0].length || file.column || Store.defaultcolumnNum);
+            if (next[axis] != null && (!Number.isInteger(next[axis]) || next[axis] < 0 || next[axis] >= limit)) throw new RangeError("冻结位置超出工作表范围。");
+        }
+        const both = next.row != null && next.column != null;
+        file.frozen = both ? { type: "rangeBoth", range: { row_focus: next.row, column_focus: next.column } } :
+            next.row != null ? { type: "rangeRow", range: { row_focus: next.row } } :
+            next.column != null ? { type: "rangeColumn", range: { column_focus: next.column } } : { type: "cancel" };
+        if (file.index == Store.currentSheetIndex) {
+            this.freezenhorizontaldata = null;
+            this.freezenverticaldata = null;
+            $("#luckysheet-freezebar-horizontal, #luckysheet-freezebar-vertical").hide();
+            this.initialFreezen(file.index);
+            luckysheetrefreshgrid();
+        }
+        server.saveParam("all", file.index, file.frozen, { k: "frozen" });
+        return file.frozen;
+    },
     freezenHorizontalHTML: '<div id="luckysheet-freezebar-horizontal" class="luckysheet-freezebar" tabindex="0"><div class="luckysheet-freezebar-handle luckysheet-freezebar-horizontal-handle" ><div class="luckysheet-freezebar-handle-bar luckysheet-freezebar-horizontal-handle-title" ></div><div class="luckysheet-freezebar-handle-bar luckysheet-freezebar-horizontal-handle-bar" ></div></div><div class="luckysheet-freezebar-drop luckysheet-freezebar-horizontal-drop" ><div class="luckysheet-freezebar-drop-bar luckysheet-freezebar-horizontal-drop-title" ></div><div class="luckysheet-freezebar-drop-bar luckysheet-freezebar-horizontal-drop-bar" >&nbsp;</div></div></div>',
     freezenVerticalHTML: '<div id="luckysheet-freezebar-vertical" class="luckysheet-freezebar" tabindex="0"><div class="luckysheet-freezebar-handle luckysheet-freezebar-vertical-handle" ><div class="luckysheet-freezebar-handle-bar luckysheet-freezebar-vertical-handle-title" ></div><div class="luckysheet-freezebar-handle-bar luckysheet-freezebar-vertical-handle-bar" ></div></div><div class="luckysheet-freezebar-drop luckysheet-freezebar-vertical-drop" ><div class="luckysheet-freezebar-drop-bar luckysheet-freezebar-vertical-drop-title" ></div><div class="luckysheet-freezebar-drop-bar luckysheet-freezebar-vertical-drop-bar" >&nbsp;</div></div></div>',
     initialHorizontal: true,
@@ -210,6 +248,10 @@ const luckysheetFreezen = {
         //     server.saveParam("all", Store.currentSheetIndex, currentSheet.freezen, { "k": "freezen" });
         // }
 
+        const horizontal=currentSheet.freezen.horizontal && currentSheet.freezen.horizontal.freezenhorizontaldata;
+        const vertical=currentSheet.freezen.vertical && currentSheet.freezen.vertical.freezenverticaldata;
+        const row=horizontal?horizontal[1]-1:null, column=vertical?vertical[1]-1:null;
+        currentSheet.frozen=row!=null&&column!=null?{type:"rangeBoth",range:{row_focus:row,column_focus:column}}:row!=null?{type:"rangeRow",range:{row_focus:row}}:column!=null?{type:"rangeColumn",range:{column_focus:column}}:{type:"cancel"};
         // use new property frozen
         if(currentSheet.frozen != null){
             server.saveParam("all", Store.currentSheetIndex, currentSheet.frozen, { "k": "frozen" });
@@ -1752,8 +1794,8 @@ const luckysheetFreezen = {
         const column_focus = select_save["column_focus"] == null ? select_save["column"][0] : select_save["column_focus"];
 
         const range = {
-            row_focus: focus.row_focus || row_focus,
-            column_focus: focus.column_focus || column_focus
+            row_focus: focus.row_focus == null ? row_focus : focus.row_focus,
+            column_focus: focus.column_focus == null ? column_focus : focus.column_focus
         }
 
         const frozen = {

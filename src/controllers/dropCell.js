@@ -1,3 +1,6 @@
+import luckysheetConfigsetting from "./luckysheetConfigsetting";
+import { updateTextFill } from "./textFill";
+import { fillGenerator } from "../utils/fillSeries";
 import { rowLocationByIndex, colLocationByIndex } from '../global/location';
 import { countfunc } from '../global/count';
 import { getBorderInfoCompute } from '../global/border';
@@ -17,6 +20,30 @@ import dayjs from 'dayjs'
 
 //选区下拉
 const luckysheetDropCell = {
+    preview(row,column,x,y) {
+        if(!luckysheetConfigsetting.safeStrMode)return;
+        this.previewPosition={row,column,x,y};
+        if(this.previewFrame!=null)return;
+        this.previewFrame=requestAnimationFrame(()=>{
+            this.previewFrame=null;
+            const point=this.previewPosition, range=Store.luckysheet_select_save[Store.luckysheet_select_save.length-1];
+            if(!Store.luckysheet_cell_selected_extend||!range)return;
+            const vertical=point.row<range.row[0]||point.row>range.row[1];
+            const direction=vertical?(point.row<range.row[0]?"up":"down"):(point.column<range.column[0]?"left":"right");
+            const length=vertical?(direction==="up"?range.row[0]-point.row:point.row-range.row[1]):direction==="left"?range.column[0]-point.column:point.column-range.column[1];
+            if(length<=0){this.hidePreview();return;}
+            const key=JSON.stringify(range)+direction;
+            if(!this.previewCache||this.previewCache.key!==key||this.previewCache.data!==Store.flowdata) {
+                const cells=[];
+                for(let n=vertical?range.row[0]:range.column[0];n<=(vertical?range.row[1]:range.column[1]);n++)cells.push(vertical?Store.flowdata[n][range.column[0]]:Store.flowdata[range.row[0]][n]);
+                this.previewCache={key,data:Store.flowdata,generate:fillGenerator(cells,direction)};
+            }
+            if(!this.previewLabel)this.previewLabel=$("<div class='luckysheet-decoration-label' role='tooltip'></div>").appendTo('body');
+            this.previewLabel.text("填充终点："+this.previewCache.generate(length).v).css({left:Math.min(point.x+14,window.innerWidth-220),top:Math.min(point.y+18,window.innerHeight-50)}).show();
+        });
+    },
+    hidePreview() {if(this.previewFrame!=null)cancelAnimationFrame(this.previewFrame);this.previewFrame=null;if(this.previewLabel)this.previewLabel.hide();},
+    reset() {this.hidePreview();if(this.previewLabel)this.previewLabel.remove();this.previewLabel=null;this.previewCache=null;this.textFillBase=null;if(this.cancelTextFill)this.cancelTextFill();this.cancelTextFill=null;},
     iconHtml: '<div id="luckysheet-dropCell-icon" style="position: absolute;padding: 2px;background-color: #f1f1f1;z-index: 990;cursor: pointer;">'+
                 '<div id="icon_dropCell"></div>'+
               '</div>',
@@ -366,6 +393,7 @@ const luckysheetDropCell = {
 
         //点击数据填充类型
         $(document).off("click.dCtypeList").on("click.dCtypeList", "#luckysheet-dropCell-typeList .luckysheet-cols-menuitem", function(){
+            if(_this.isFilling)return;
             $("#luckysheet-dropCell-typeList .fa-check").remove();
             $(this).find("span").append('<i class="fa fa-check luckysheet-mousedown-cancel"></i>');
 
@@ -388,6 +416,11 @@ const luckysheetDropCell = {
         let str_r = copyRange["row"][0], end_r = copyRange["row"][1];
         let str_c = copyRange["column"][0], end_c = copyRange["column"][1];
 
+        if (luckysheetConfigsetting.safeStrMode) {
+            let hasNumber=false, hasDate=false, hasSuffix=false;
+            for(let r=str_r;r<=end_r;r++)for(let c=str_c;c<=end_c;c++){const value=Store.flowdata[r][c]; const txt=value&&value.v!=null?String(value.v):""; hasNumber=hasNumber||/^-?\d+(?:\.\d+)?$/.test(txt);hasDate=hasDate||/^\d{4}[-/]\d{2}[-/]\d{2}$/.test(txt);hasSuffix=hasSuffix||/\D\d+$/.test(txt);}
+            return [hasNumber,hasSuffix,hasDate,true,true,true,true];
+        }
         let hasNumber = false,
             hasExtendNumber = false,
             hasDate = false,
@@ -431,6 +464,7 @@ const luckysheetDropCell = {
         return [hasNumber, hasExtendNumber, hasDate, hasChn, hasChnWeek1, hasChnWeek2, hasChnWeek3];
     },
     update: function(){
+        if (luckysheetConfigsetting.safeStrMode) return updateTextFill(this);
         let _this = this;
 
         if(!checkProtectionLockedRangeList([_this.applyRange], Store.currentSheetIndex)){
