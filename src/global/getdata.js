@@ -10,7 +10,7 @@ import locale from '../locale/locale';
 import Store from '../store';
 
 //Get selection range value
-export function getdatabyselection(range, sheetIndex) {
+export function getdatabyselection(range, sheetIndex, includeHidden = false) {
     if(range == null){
         range = Store.luckysheet_select_save[0];
     }
@@ -37,7 +37,7 @@ export function getdatabyselection(range, sheetIndex) {
             continue;
         }
 
-        if (cfg["rowhidden"] != null && cfg["rowhidden"][r] != null) {
+        if (!includeHidden && cfg["rowhidden"] != null && cfg["rowhidden"][r] != null) {
             continue;
         }
 

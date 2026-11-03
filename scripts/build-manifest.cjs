@@ -27,7 +27,7 @@ function buildManifest() {
   fs.writeFileSync(
     path.join(root, "build-manifest.json"),
     JSON.stringify(
-      { version, batch: "2026-11-02-business", contentHash, files },
+      { version, batch: "2026-11-03-frontend-integration", contentHash, files },
       null,
       2
     )

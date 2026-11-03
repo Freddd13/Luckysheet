@@ -1487,10 +1487,10 @@ export function getRangeValue(options = {}) {
     let file = Store.luckysheetfile[order];
 
     if (!range || typeof range === 'object') {
-        return getdatabyselection(range, file.index);
+        return getdatabyselection(range, file.index, options.includeHidden === true);
     } else if (typeof range === 'string') {
         if (formula.iscelldata(range)) {
-            return getdatabyselection(formula.getcellrange(range), file.index)
+            return getdatabyselection(formula.getcellrange(range), file.index, options.includeHidden === true)
         } else {
             tooltip.info('The range is invalid, please check range parameter.', '')
         }
@@ -6644,3 +6644,37 @@ function frozenFocus(range) {
 }
 export function cancelHorizontalFrozen(options={}) { return luckysheetFreezen.setAxes({row:null},options.order); }
 export function cancelVerticalFrozen(options={}) { return luckysheetFreezen.setAxes({column:null},options.order); }
+
+
+export function isCellEditing() { return isEditMode(); }
+
+export function setCellChanges(changes, options = {}) {
+    const sheetIndex = options.sheetIndex == null ? Store.currentSheetIndex : options.sheetIndex;
+    const file = Store.luckysheetfile.find(item => item.index == sheetIndex);
+    if (!file || file.index != Store.currentSheetIndex || !luckysheetConfigsetting.safeStrMode) return false;
+    if (options.revision != null && options.revision !== viewDecorations.getRevision(file.index)) return false;
+    if (!Array.isArray(changes) || !changes.length) throw new TypeError("修改列表不能为空。");
+    const seen = new Set();
+    const points = changes.map(change => {
+        if (!change || !Number.isInteger(change.row) || !Number.isInteger(change.column) || change.row < 0 || change.column < 0 || typeof change.value !== "string") throw new TypeError("单元格修改必须包含有效坐标和字符串值。");
+        const key = change.row + ":" + change.column;
+        if (seen.has(key)) throw new TypeError("修改列表包含重复单元格。");
+        seen.add(key);
+        return { row: change.row, column: change.column, value: change.value };
+    });
+    return writeTextPoints(points, file, { ...options, operation: "cellChanges" });
+}
+
+
+export function applyStructureChange(change, options = {}) {
+    const index = options.sheetIndex == null ? Store.currentSheetIndex : options.sheetIndex;
+    const info = getWorkbookInfo().sheets.find(sheet => sheet.sheetIndex == index);
+    if (!info || index != Store.currentSheetIndex || Store.allowEdit === false) return false;
+    if (options.revision != null && options.revision !== info.revision) return false;
+    if (!["row", "column"].includes(change.axis) || !["insert", "delete"].includes(change.kind) || !Number.isInteger(change.index) || change.index < 0 || !Number.isInteger(change.count) || change.count < 1) throw new TypeError("行列操作参数无效。");
+    const length = change.axis === "row" ? info.rowCount : info.columnCount;
+    if (change.index >= length || (change.kind === "delete" && (change.index + change.count > length || change.count >= length))) throw new RangeError("行列操作范围超出工作表。");
+    if (change.kind === "insert") luckysheetextendtable(change.axis, change.index, change.count, "lefttop", index);
+    else luckysheetdeletetable(change.axis, change.index, change.index + change.count - 1, index);
+    return viewDecorations.getRevision(index) !== info.revision;
+}

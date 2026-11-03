@@ -3071,3 +3071,13 @@ Luckysheet针对常用的数据操作需求，开放了主要功能的API，开�
 	二维数组数据转化成 `{r, c, v}` 格式 一维数组
 
 	> 推荐使用新API：<a href='#transToCellData'>transToCellData</a>
+
+
+## 前端标注与 AI 接入补充（2026-11-03）
+
+- `getRangeValue({order,range,includeHidden:true})` 保留隐藏行，返回坐标对应的单元格副本；原默认行为保留。
+- `isCellEditing()` 查询当前编辑状态；AI 读取和应用前先 `exitEditMode()`，仍处于编辑状态时停止操作。
+- `setCellChanges([{row,column,value}],{sheetIndex,revision,signal})` 只修改当前表，`value` 必须为字符串。整批检查坐标、重复点、保护、验证与版本，复用文本写入路径；返回 `boolean` 或 `Promise<boolean>`，一次提交、一次撤销。`false` 表示未提交。
+- `applyStructureChange({axis,kind,index,count},{sheetIndex,revision})`：`axis` 为 `row/column`，`kind` 为 `insert/delete`，插入位置为 `index` 之前。沿用结构保护及 hook，返回实际提交的布尔结果。
+- `sheetDataChanged` 的行列增删通知新增可选 `structureChanges:[{id,axis,kind,index,count,phase}]`。`kind` 表示本次实际动作，`phase` 为 `apply/undo/redo`；一次结构操作及其撤销重做使用同一 `id`。值和格式操作不提供此字段。非当前表及协同结构应用同样通知。
+- 显示区域定义由业务系统独立存储。区域增删改不进入工作表历史；业务可使用结构操作身份恢复区域边界。

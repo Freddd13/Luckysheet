@@ -1,3 +1,4 @@
+import { describeStructureChange } from "./structureChanges";
 import viewDecorations from "./viewDecorations";
 import pako from 'pako'
 import { showloading, hideloading } from '../global/loading';
@@ -979,7 +980,7 @@ try {
 	        $("#luckysheet_info_detail_input").val(value).css("width", getByteLen(value) * 10);
 	    }
 
-} finally { if(Store.luckysheetfile && Store.luckysheetfile.some(file=>file.index==item.i)) viewDecorations.changed(item.i,null,"cooperative"); }
+} finally { if(Store.luckysheetfile && Store.luckysheetfile.some(file=>file.index==item.i)) viewDecorations.changed(item.i,null,"cooperative",describeStructureChange(item.t === "arc" ? "addRC" : item.t === "drc" ? "delRC" : "", {...item.v,rc:item.rc})); }
 },
     multipleIndex: 0,
     multipleRangeShow: function(id, name, r, c, value) {

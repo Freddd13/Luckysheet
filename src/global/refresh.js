@@ -1,3 +1,4 @@
+import { describeStructureChange } from "../controllers/structureChanges";
 import viewDecorations from "../controllers/viewDecorations";
 import { deferForInstance, cancelForInstance } from "../utils/instance";
 import rhchInit from './rhchInit';
@@ -633,7 +634,7 @@ function jfrefreshgrid_adRC(data, cfg, ctrlType, ctrlValue, calc, filterObj, cf,
     //行高、列宽刷新
     jfrefreshgrid_rhcw(Store.flowdata.length, Store.flowdata[0].length);
 
-if(Store.clearjfundo) viewDecorations.changed(Store.currentSheetIndex,null,ctrlType);
+if(Store.clearjfundo) viewDecorations.changed(Store.currentSheetIndex,null,ctrlType,describeStructureChange(ctrlType,ctrlValue));
 }
 
 //删除单元格 刷新表格

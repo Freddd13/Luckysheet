@@ -102,6 +102,7 @@ export function writeTextRange(
   let hasValueChanges = false;
   const initialSheet = Store.currentSheetIndex;
   const valid = () =>
+    !(options.signal && options.signal.aborted) &&
     getInstanceRevision() === instanceRevision &&
     file.data === originalData &&
     Store.luckysheetfile.includes(file) &&

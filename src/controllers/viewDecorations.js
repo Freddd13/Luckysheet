@@ -203,8 +203,8 @@ const viewDecorations = {
     );
     this.bindHover();
   },
-  changed(index, ranges, type) {
-    this.changedMany([{ sheetIndex: index, ranges, type }]);
+  changed(index, ranges, type, structureChanges) {
+    this.changedMany([{ sheetIndex: index, ranges, type, ...(structureChanges ? { structureChanges } : {}) }]);
   },
   noteFormulaChanges(changes) {
     const affected = new Set();

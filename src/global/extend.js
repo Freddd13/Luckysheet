@@ -1,3 +1,5 @@
+import viewDecorations from "../controllers/viewDecorations";
+import { describeStructureChange } from "../controllers/structureChanges";
 import editor from "./editor";
 import formula from "./formula";
 import { jfrefreshgrid_adRC, jfrefreshgrid_deleteCell, jfrefreshgrid_rhcw } from "./refresh";
@@ -23,6 +25,7 @@ import luckysheetConfigsetting from "../controllers/luckysheetConfigsetting";
  * @returns
  */
 function luckysheetextendtable(type, index, value, direction, sheetIndex) {
+    if (Store.allowEdit === false) return false;
     sheetIndex = sheetIndex ?? Store.currentSheetIndex;
 
     if (type == "row" && !checkProtectionAuthorityNormal(sheetIndex, "insertRows")) {
@@ -902,6 +905,7 @@ function luckysheetextendtable(type, index, value, direction, sheetIndex) {
         file.luckysheet_alternateformat_save = newAFarr;
         file.dataVerification = newDataVerification;
         file.hyperlink = newHyperlink;
+        viewDecorations.changed(file.index, null, "addRC", describeStructureChange("addRC", {index, len:value, direction, rc:type1}));
     }
 
     let range = null;
@@ -1034,6 +1038,7 @@ function luckysheetextendData(rowlen, newData) {
 
 //删除行列
 function luckysheetdeletetable(type, st, ed, sheetIndex) {
+    if (Store.allowEdit === false) return false;
     sheetIndex = sheetIndex || Store.currentSheetIndex;
 
     if (type == "row" && !checkProtectionAuthorityNormal(sheetIndex, "deleteRows")) {
@@ -1798,6 +1803,7 @@ function luckysheetdeletetable(type, st, ed, sheetIndex) {
         file.luckysheet_alternateformat_save = newAFarr;
         file.dataVerification = newDataVerification;
         file.hyperlink = newHyperlink;
+        viewDecorations.changed(file.index, null, "delRC", describeStructureChange("delRC", {index:st, len:ed-st+1, rc:type1}));
     }
 }
 

@@ -1,3 +1,4 @@
+import { describeStructureChange } from "./structureChanges";
 import viewDecorations from "./viewDecorations";
 import sheetmanage from './sheetmanage';
 import server from './server';
@@ -467,7 +468,7 @@ const controlHistory = {
 
         if(ctr.type==='pasteCut') {
             viewDecorations.changedMany(ctr.source.sheetIndex==ctr.target.sheetIndex ? [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range,ctr.target.range],type:'undo'}] : [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range],type:'undo'},{sheetIndex:ctr.target.sheetIndex,ranges:[ctr.target.range],type:'undo'}]);
-        } else viewDecorations.changed(Store.currentSheetIndex,ctr.type==='datachange'?null:ctr.range,"undo");
+        } else viewDecorations.changed(Store.currentSheetIndex,ctr.type==='datachange'?null:ctr.range,"undo",describeStructureChange(ctr.type,ctr.ctrlValue,"undo"));
 },
     undo: function () {
         if (Store.jfundo.length == 0) {
@@ -790,7 +791,7 @@ const controlHistory = {
 
         if(ctr.type==='pasteCut') {
             viewDecorations.changedMany(ctr.source.sheetIndex==ctr.target.sheetIndex ? [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range,ctr.target.range],type:'redo'}] : [{sheetIndex:ctr.source.sheetIndex,ranges:[ctr.source.range],type:'redo'},{sheetIndex:ctr.target.sheetIndex,ranges:[ctr.target.range],type:'redo'}]);
-        } else viewDecorations.changed(Store.currentSheetIndex,ctr.type==='datachange'?null:ctr.range,"redo");
+        } else viewDecorations.changed(Store.currentSheetIndex,ctr.type==='datachange'?null:ctr.range,"redo",describeStructureChange(ctr.type,ctr.ctrlValue,"redo"));
 }
 };
 
